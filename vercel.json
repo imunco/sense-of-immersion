@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
+  "installCommand": "echo no-dependencies",
+  "buildCommand": "node build-vercel.mjs",
   "outputDirectory": "public",
   "crons": [
     {
@@ -18,12 +19,6 @@
           "value": "no-store"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/root"
     }
   ]
 }

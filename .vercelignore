@@ -1,18 +1,16 @@
-# Vercel 只用来跑 /api 的归档触发；站点本体在 GitHub Pages。
-# 注意：这里用 .gitignore 语义，不带斜杠的模式会匹配任意层级，
-# 所以必须用前导 / 锚定到仓库根 —— 否则 'index.html' 会把 public/index.html 也排掉，
-# 结果根路径返回 404。
+# 站点本体已经交给 Vercel 输出（见 build-vercel.mjs），所以这里不再排除页面和资源。
+# 只排除上传时不需要的东西。（.gitignore 语义：不带斜杠的模式会匹配任意层级，所以一律用前导 / 锚定）
+/.git
 /.github
-/.dsh-passphrase.local
-/index.html
-/admin.html
-/assets
-/data
-/scripts
-/tests
-/shared
-/backups
-/*.md
 /.vercel
+/.dsh-passphrase.local
 /node_modules
+/backups
+/tests
+/scripts
+/shared
+/*.md
 /package-lock.json
+/*.ps1
+/.gitignore
+/.gitattributes

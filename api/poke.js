@@ -4,7 +4,7 @@ import { cors, dispatch } from '../lib/dispatch.js';
    浏览器永远拿不到 GitHub 令牌。 */
 export default async function handler(req, res) {
   const origin = req.headers.origin || '';
-  const allowed = cors(res, origin);
+  const allowed = cors(res, origin, req.headers.host);
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
 
   if (req.method !== 'POST' && req.method !== 'GET') { res.status(405).json({ ok: false, message: '只接受 POST / GET' }); return; }

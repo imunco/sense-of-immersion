@@ -15,6 +15,9 @@ backups/
 .dsh-watchdog.log
 
 .vercel/
+# Vercel 的构建产物
+/public/
+
 node_modules/
 tests/shots/
 package-lock.json
