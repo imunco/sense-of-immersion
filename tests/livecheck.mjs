@@ -29,7 +29,7 @@ console.log('蛛网:', JSON.stringify(await page.evaluate(() => ({
 
 await page.goto(BASE + '/admin.html', { waitUntil: 'networkidle2' });
 await wait(1200);
-await page.type('#gate-pass', 'yixian-2026', { delay: 25 });
+await page.type('#gate-pass', (process.env.WISH_ADMIN_PASSPHRASE || ''), { delay: 25 });
 await page.click('#gate-form button[type=submit]');
 await page.waitForFunction(() => !document.querySelector('#room').hidden, { timeout: 60000 });
 await page.waitForFunction(() => !/正在解密/.test(document.querySelector('#proj-status').textContent), { timeout: 60000 });

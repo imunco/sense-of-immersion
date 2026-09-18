@@ -1,0 +1,12 @@
+# 许愿馆本身欢迎抓取；文档、脚本、后台、数据目录不要被索引。
+# （这个文件只是建议，真正的保护是"仓库里本来就没有敏感明文"。）
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /data/
+Disallow: /scripts/
+Disallow: /tests/
+Disallow: /api/
+Disallow: /shared/
+Disallow: /lib/
+Disallow: /*.md$

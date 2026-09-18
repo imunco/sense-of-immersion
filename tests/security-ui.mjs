@@ -81,7 +81,7 @@ if (found) {
 await p.goto(BASE + '/admin.html', { waitUntil: 'networkidle2' });
 await wait(800);
 const t1 = Date.now();
-await p.type('#gate-pass', 'yixian-2026', { delay: 15 });
+await p.type('#gate-pass', (process.env.WISH_ADMIN_PASSPHRASE || ''), { delay: 15 });
 await p.click('#gate-form button[type=submit]');
 await p.waitForFunction(() => !document.querySelector('#room').hidden, { timeout: 60000 });
 const unlockMs = Date.now() - t1;

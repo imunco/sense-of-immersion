@@ -3,7 +3,7 @@ import { sealForSite, openFromSite } from '../shared/envelope.js';
 import { deriveKey, decryptJSON } from '../shared/crypto.js';
 const cfg = JSON.parse(await readFile('data/config.json','utf8'));
 const keys = JSON.parse(await readFile('data/private/keys.json','utf8'));
-const key = await deriveKey('yixian-2026', cfg.crypto.salt, cfg.crypto.iterations);
+const key = await deriveKey((process.env.WISH_ADMIN_PASSPHRASE || ''), cfg.crypto.salt, cfg.crypto.iterations);
 const privateJwk = await decryptJSON(key, keys);
 const meta = { tz: 'Asia/Shanghai', lg: 'zh-CN', ua: 'Chrome on Windows', vp: '1440x900', ref: 'direct', dv: 'd_abc123', n: 3, src: 'web' };
 const env = await sealForSite(cfg.siteKey, meta);

@@ -95,7 +95,7 @@ await shot('12-mobile-reveal');
 await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
 await page.goto(BASE + '/admin.html', { waitUntil: 'networkidle2' });
 await wait(1200);
-await page.type('#gate-pass', 'yixian-2026', { delay: 30 });
+await page.type('#gate-pass', (process.env.WISH_ADMIN_PASSPHRASE || ''), { delay: 30 });
 await page.click('#gate-form button[type=submit]');
 await wait(3000);
 await shot('13-admin-room');
