@@ -30,11 +30,16 @@ const run = (cmd, args) => execFileSync(cmd, args, {
   env: Object.assign({}, process.env, { WISH_ADMIN_PASSPHRASE: pass })
 });
 
-/* 工作区如果有非 data 的改动，说明有人在改代码 —— 不要自动提交，跳过这一轮 */
+/* 只有「已跟踪的源码文件被改动」才算正在开发中，这时不要自动 pull --autostash。
+   未跟踪的新文件（?? 开头）和 data/ 下的改动都不影响——pull 会把它们 autostash 起来。 */
 const dirty = (() => { try { return run('git', ['status', '--porcelain']).trim(); } catch (e) { return ''; } })();
-const unrelated = dirty.split('\n').filter(Boolean).filter((l) => l.indexOf(' data/') < 0);
-if (unrelated.length) {
-  await log('工作区有 ' + unrelated.length + ' 处非 data 的改动，本轮跳过（避免把开发中的改动自动提交）。');
+const wip = dirty.split('\n').filter(Boolean).filter((l) => {
+  if (l.indexOf('??') === 0) return false;             /* 未跟踪的新文件 */
+  if (l.indexOf(' data/') >= 0) return false;          /* 数据文件，本来就要提交 */
+  return true;                                        /* 已跟踪的源码被改了 */
+});
+if (wip.length) {
+  await log('有 ' + wip.length + ' 个已跟踪文件处于改动中，本轮跳过（避免打断开发）。');
   process.exit(0);
 }
 
