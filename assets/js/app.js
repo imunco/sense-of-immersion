@@ -140,6 +140,7 @@ async function loadAll() {
     recent.forEach(function (w) { if (w.relayTime) state.cursor = Math.max(state.cursor, w.relayTime); });
     absorb(recent, false);
   } catch (e) {}
+  counts();
 }
 
 async function tick() {

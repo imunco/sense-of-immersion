@@ -50,20 +50,26 @@ async function load() {
 }
 
 /* ---------------------------------------------------------- 视图 */
+/* 屏蔽与本地隐藏之后的全部数据 —— 统计口径用它 */
+function scoped() {
+  let rows = state.rows.slice();
+  if (!state.showHidden) {
+    const hid = hiddenIds();
+    rows = rows.filter((r) => hid.indexOf(r.id) < 0 && !state.blocked.has(r.id));
+  }
+  return rows;
+}
+
 function visible() {
   const now = Date.now();
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
-  let rows = state.rows.slice();
+  let rows = scoped();
   if (state.filter === 'tonight') rows = rows.filter((r) => (r.ts || 0) >= today);
   else if (state.filter === 'week') rows = rows.filter((r) => (r.ts || 0) >= now - 7 * 864e5);
   else if (state.filter === 'live') rows = rows.filter((r) => state.liveIds.has(r.id));
   if (state.q) {
     const q = state.q.toLowerCase();
     rows = rows.filter((r) => (r.name + ' ' + r.wish + ' ' + (r.tz || '') + ' ' + (r.ua || '')).toLowerCase().indexOf(q) >= 0);
-  }
-  if (!state.showHidden) {
-    const hid = hiddenIds();
-    rows = rows.filter((r) => hid.indexOf(r.id) < 0 && !state.blocked.has(r.id));
   }
   rows.sort((a, b) => state.sort === 'desc' ? (b.ts || 0) - (a.ts || 0) : (a.ts || 0) - (b.ts || 0));
   return rows;
@@ -72,7 +78,7 @@ function visible() {
 function deviceKey(r) { return r.dv || (r.ua || '') + '|' + (r.vp || '') + '|' + (r.tz || ''); }
 
 function renderLedger() {
-  const rows = state.rows;
+  const rows = scoped();
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
   const tonight = rows.filter((r) => (r.ts || 0) >= today).length;
   const devices = new Set(rows.map(deviceKey)).size;
@@ -90,8 +96,9 @@ function renderLedger() {
 
   const line = $('#ledger-line');
   line.textContent = '';
+  const liveCount = rows.filter((r) => state.liveIds.has(r.id)).length;
   [['总计', rows.length + ' 条'], ['独立设备', devices + ' 台'], ['平均', avg + ' 字'], ['最长', longest + ' 字'],
-   ['未归档', state.liveIds.size + ' 条']].forEach((pair) => {
+   ['未归档', liveCount + ' 条']].forEach((pair) => {
     const s = document.createElement('span');
     s.textContent = pair[0] + ' ';
     const v = document.createElement('b');
@@ -113,7 +120,7 @@ function renderTimeline() {
     days.push({ t: d.getTime(), label: (d.getMonth() + 1) + '/' + d.getDate(), n: 0 });
     days[days.length - 1].next = next;
   }
-  state.rows.forEach((r) => {
+  scoped().forEach((r) => {
     const ts = r.ts || 0;
     for (let i = days.length - 1; i >= 0; i--) {
       if (ts >= days[i].t && ts < days[i].next) { days[i].n++; break; }
