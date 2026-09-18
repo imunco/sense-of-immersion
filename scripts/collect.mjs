@@ -252,6 +252,39 @@ const metaSaved = await appendEncrypted(metaPath, metaOut, (m, e) => ({ id: m.id
 const vaultSaved = await appendEncrypted(vaultPath, vaultOut.filter((r) => !vaultKnown.has(r.id)), (r, e) => ({ id: r.id, e }));
 const queueSaved = await appendEncrypted(queuePath, quarantined, (r, e) => ({ id: r.id, e }));
 
+/* ---------------------------------------------------------------- 自动清理屏蔽名单
+   名单里只应该留两种 id：
+     · 已经归档、但被屏蔽的（不留在名单里就会重新被前台读出来）
+     · 还躺在上游中转站缓存里的（撤掉就会重现）
+   中转站 12 小时后会自动清掉老消息，届时这些 id 自然落出名单，不需要人工维护。 */
+let pruned = 0;
+if (blocked.size) {
+  let relayIds = null;
+  try {
+    const all = await fetch(ENDPOINT + '/' + encodeURIComponent(TOPIC) + '/json?poll=1&since=all', { headers: { 'user-agent': 'wish-silk-collector/3.0' } });
+    if (all.ok) {
+      relayIds = new Set();
+      (await all.text()).split('\n').filter(Boolean).forEach((line) => {
+        try {
+          const ev = JSON.parse(line);
+          if (ev.event !== 'message') return;
+          const w = JSON.parse(ev.message);
+          if (w && w.id) relayIds.add(w.id);
+        } catch {}
+      });
+    }
+  } catch (e) { relayIds = null; }
+  if (relayIds) {
+    const archiveIds = new Set(finalList.map((r) => r.id));
+    const keep = [];
+    for (const id of blocked) if (archiveIds.has(id) || relayIds.has(id)) keep.push(id);
+    if (keep.length !== blocked.size) {
+      await writeJSON(J('data/blocked.json'), keep.sort());
+      pruned = blocked.size - keep.length;
+    }
+  }
+}
+
 rl.total = (rl.total || 0) + accepted.length + vaultOut.length;
 const dkeys = Object.keys(rl.devices);
 if (dkeys.length > 5000) for (const k of dkeys.slice(0, dkeys.length - 5000)) delete rl.devices[k];
@@ -271,6 +304,7 @@ console.log(JSON.stringify({
     已屏蔽: stats.blocked, 超量截断: stats.flood
   },
   归档: finalList.length,
+  屏蔽名单: blocked.size - pruned + ' 条' + (pruned ? '（自动清掉 ' + pruned + ' 条过期的）' : ''),
   元数据: metaSaved,
   元数据解不开: stats.meta_lost,
   全站本小时: rl.global.length

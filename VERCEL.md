@@ -101,3 +101,144 @@ curl -s -X POST https://yixian-archive.vercel.app/api/poke
 - 这个 PAT 只有 `Actions: write`，不能读代码、不能改内容、不能碰其他仓库。
 - 即使有人疯狂打 `/api/poke`，函数内部有 45 秒的最小间隔，Actions 那边还有 concurrency 串行化，
   最坏结果是多跑几次空采集（每次约 10 秒）。
+---
+
+# 附录：更换 GitHub PAT（详细步骤）
+
+## 什么时候需要换
+
+- 令牌被谁看到了（比如贴进过聊天、截图、日志）
+- 快到期了（GitHub 会在到期前发邮件提醒）
+- 权限需要调整
+
+整套流程约 5 分钟，**期间归档不会中断**：新令牌验证通过后才会顶掉旧的。
+
+## 第 1 步：在 GitHub 上生成新令牌
+
+打开 https://github.com/settings/personal-access-tokens/new
+
+| 字段 | 填什么 |
+|---|---|
+| **Token name** | `yixian-archive-dispatch-2026-09`（带上日期，方便以后认） |
+| **Expiration** | 90 days（推荐）；也可以自定义，但别忘了续 |
+| **Description** | 选填：`一线千愿归档触发器` |
+| **Repository access** | 选 **Only select repositories** → 只勾 **imunco/sense-of-immersion** |
+| **Permissions → Repository permissions** | 只动一项：**Actions → Read and write**。其余全部保持 **No access** |
+
+> ⚠️ 千万不要给 **Contents**。采集器写仓库用的是 Actions 自带的 `GITHUB_TOKEN`，
+> 这个 PAT 只负责「按一下按钮触发 workflow」，给多了纯属浪费风险。
+>
+> `Metadata: Read-only` 是 GitHub 强制附带的，不用管。
+
+点 **Generate token**，立刻复制 `github_pat_...`（**只显示这一次**，关掉就再也看不到）。
+
+## 第 2 步：先验证新令牌（不要急着换）
+
+在仓库根目录的 PowerShell 里跑（把 `github_pat_新的` 换成你复制的）：
+
+```powershell
+$new = "github_pat_新的"
+$h = @{
+  Authorization = "Bearer $new"
+  Accept = 'application/vnd.github+json'
+  'X-GitHub-Api-Version' = '2022-11-28'
+  'User-Agent' = 'rotate-check'
+}
+
+# ① 读权限：应列出 collect-wishes 和 pages-build-deployment 两个 workflow
+(Invoke-RestMethod -Uri 'https://api.github.com/repos/imunco/sense-of-immersion/actions/workflows' -Headers $h).workflows | Select-Object name, state
+
+# ② 写权限：真的触发一次采集。没有报错就是 204 成功（会多跑一次无害的空采集）
+Invoke-RestMethod -Method Post -Uri 'https://api.github.com/repos/imunco/sense-of-immersion/actions/workflows/collect.yml/dispatches' -Headers $h -Body '{"ref":"main"}' -ContentType 'application/json'
+Write-Output "写权限 OK"
+
+# ③ 确认这个令牌只能碰这一个仓库（对别的仓库应该是 404）
+try { Invoke-RestMethod -Uri 'https://api.github.com/repos/imunco/laucher1' -Headers $h | Out-Null; Write-Output "⚠ 警告：这个令牌能访问别的仓库，权限给多了" }
+catch { Write-Output "✓ 访问其他仓库被拒（符合最小权限）" }
+```
+
+② 报 `403 Resource not accessible by personal access token` 的话，
+说明 **Actions** 权限没设成 **Read and write**，回第 1 步改。
+
+## 第 3 步：把新令牌写进 Vercel
+
+### 方式 A：网页（最省事，推荐）
+
+1. 打开 https://vercel.com/xcdh520-githubs-projects/yixian-archive/settings/environment-variables
+2. 找到 **GITHUB_DISPATCH_TOKEN** → 点右侧 `...` → **Edit**
+3. 把 Value 换成新令牌 → **Save**
+4. 回到 https://vercel.com/xcdh520-githubs-projects/yixian-archive/deployments
+   → 最新那条右边 `...` → **Redeploy**（**必须重新部署，否则还在用旧值**）
+
+### 方式 B：命令行
+
+Vercel CLI 没有「修改」环境变量，只能删掉再加：
+
+```bash
+cd R:\desktop\sense_of_immersion
+
+npx vercel login          # 没登录过才需要
+npx vercel link           # 选已存在的项目 yixian-archive
+
+# 三个 target 都要删（当初是按 production/preview/development 一起设的）
+npx vercel env rm GITHUB_DISPATCH_TOKEN production
+npx vercel env rm GITHUB_DISPATCH_TOKEN preview
+npx vercel env rm GITHUB_DISPATCH_TOKEN development
+
+# 重新添加，会提示粘贴值，粘贴新令牌后回车；三个 target 都做一遍
+npx vercel env add GITHUB_DISPATCH_TOKEN production
+npx vercel env add GITHUB_DISPATCH_TOKEN preview
+npx vercel env add GITHUB_DISPATCH_TOKEN development
+
+# 重新部署，让新变量生效
+npx vercel --prod
+```
+
+## 第 4 步：验证换成功了
+
+```bash
+# 健康检查：hasToken 必须是 true
+curl -s https://yixian-archive.vercel.app/api/health
+
+# 等 45 秒（触发端点有 45 秒最小间隔，刚跑过会被跳过）
+sleep 45
+
+# 手动触发一次：应返回 {"ok":true,"message":"已叫醒采集任务"}
+curl -s -X POST https://yixian-archive.vercel.app/api/poke
+
+# 看有没有真的起一个 workflow_dispatch 运行
+gh run list --repo imunco/sense-of-immersion --workflow collect-wishes --limit 3
+```
+
+最直观的验证：**打开许愿馆随便许一个愿，一分钟内它应该自己出现在蛛网上。**
+如果一分钟没出现，说明令牌还是旧的/权限不对，回第 2 步。
+
+## 第 5 步：吊销旧令牌
+
+新令牌确认能用之后，回 https://github.com/settings/personal-access-tokens
+找到旧的那条 → **Delete**。
+
+删掉之后 Vercel 上的服务不受影响（它用的是新令牌）。
+
+## 附：Vercel Token 怎么换
+
+如果你也想换 Vercel 令牌（不是必须，它只在我部署时用过）：
+
+1. https://vercel.com/account/tokens → **Create Token**，Scope 选你的账号，过期时间随意
+2. 生成后复制，**替换你本地任何用到它的地方**
+3. 回同一页面，把旧的 **Delete**
+
+**换 Vercel 令牌不影响已部署的服务**，因为线上跑的是部署好的函数，不需要 CLI 令牌。
+
+## 常见问题
+
+**Q：换完之后网页提交愿望，归档慢了怎么办？**
+先看 `curl -s https://yixian-archive.vercel.app/api/health` 里 `hasToken` 是不是 true。
+是 true 还慢，就是 Vercel 那条 45 秒限流在起作用，等下一分钟就好。
+
+**Q：旧的 PAT 删了，已经归档的数据会丢吗？**
+不会。PAT 只负责「触发」，不碰数据。数据是 Actions 用自己内置的 `GITHUB_TOKEN` 提交的。
+
+**Q：PAT 到期了会怎样？**
+Vercel 的 poke 会返回 401，归档会退回到 GitHub 定时（很慢）和 push 触发。
+所以到期前记得换——GitHub 会提前发邮件。

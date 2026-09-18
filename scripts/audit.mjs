@@ -30,7 +30,8 @@ async function main() {
   publicRows.forEach((r) => stored.add(r.id));
   rows(await readText(J('data/private/vault.jsonl'))).forEach((r) => stored.add(r.id));
   rows(await readText(J('data/queue.jsonl'))).forEach((r) => stored.add(r.id));
-  (await readJSON(J('data/blocked.json'), [])).forEach((i) => stored.add(i));
+  const blockedList = await readJSON(J('data/blocked.json'), []);
+  blockedList.forEach((i) => stored.add(i));
 
   /* 已归档内容的指纹：用来识别「同一条愿望被重复投递、采集器按内容去重丢弃」的情况，
      那不是丢失，不该报警。 */
@@ -68,6 +69,11 @@ async function main() {
   console.log('仓库里已有（归档 / 保险库 / 待审 / 屏蔽）：' + stored.size + ' 条');
   if (dupCount) console.log('按内容去重丢弃（同一条被重复投递，不算丢失）：' + dupCount + ' 条');
   console.log('真正还没落进仓库：' + missing.length + ' 条');
+  if (blockedList.length) {
+    const stillCached = blockedList.filter((id) => events.some((e) => e.id === id)).length;
+    console.log('屏蔽名单：' + blockedList.length + ' 条（其中 ' + stillCached + ' 条仍在中转站缓存里；' +
+      '缓存过期后采集器会自动把它们移出名单）');
+  }
 
   if (!missing.length) {
     console.log('\n✓ 中转站上的内容全部已持久化。');
