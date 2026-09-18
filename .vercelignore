@@ -8,7 +8,6 @@
 /backups
 /tests
 /scripts
-/shared
 /*.md
 /package-lock.json
 /*.ps1

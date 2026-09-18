@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(ROOT, 'public');
-const ITEMS = ['index.html', 'admin.html', 'assets', 'data', 'robots.txt'];
+/* shared/ 是浏览器要 import 的模块（store.js → ../../shared/sha256.js），必须一起输出 */
+const ITEMS = ['index.html', 'admin.html', 'assets', 'data', 'shared', 'robots.txt'];
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
