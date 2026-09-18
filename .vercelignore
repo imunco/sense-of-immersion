@@ -1,0 +1,10 @@
+# Vercel 只用来跑 /api 的归档触发，站点本体在 GitHub Pages
+admin.html
+index.html
+assets/
+data/
+scripts/
+tests/
+shared/
+backups/
+*.md

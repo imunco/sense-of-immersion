@@ -4,7 +4,7 @@ import { THREADS, threadById } from './config.js';
 import {
   loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
   newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered, loadVaultIds,
-  encodeShare, decodeShare, config, screenText, mineProof, seal
+  encodeShare, decodeShare, config, screenText, mineProof, seal, pokeArchive, pending
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
 import { SilkWeb } from './web.js';
@@ -444,6 +444,7 @@ async function submit() {
   try {
     await publish(payload);
     trackDelivered(payload);
+    pokeArchive();   /* 立刻叫醒归档，不用等下一条定时任务 */
     toast(isPrivate ? '已加密收好，只有你能看到' : '愿望已挂上蛛丝');
   } catch (e) {
     queuePending(payload);
@@ -553,6 +554,7 @@ async function boot() {
     return flushPending(known);
   }).then(function (n) {
     if (n) toast('补发了 ' + n + ' 条还没归档的愿望');
+    if (pending().length) pokeArchive();   /* 还有没落库的，顺手叫一次归档 */
   }).catch(function () {});
   state.booted = true;
 

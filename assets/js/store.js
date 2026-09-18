@@ -90,6 +90,25 @@ export async function loadVaultIds() {
   } catch (e) { return []; }
 }
 
+/* 叫醒归档：浏览器里不能放 GitHub 令牌，所以只打我们自己的 Vercel 函数，
+   由它带着令牌去 dispatch GitHub Actions。没有配置 pokeUrl 就静默跳过。 */
+const POKE_KEY = 'yixian.poked.v1';
+const POKE_MIN_GAP = 2 * 60 * 1000;
+
+export async function pokeArchive() {
+  const url = cfg.pokeUrl || FALLBACK.pokeUrl;
+  if (!url) return false;
+  try {
+    const last = Number(sessionStorage.getItem(POKE_KEY) || 0);
+    if (Date.now() - last < POKE_MIN_GAP) return false;
+    sessionStorage.setItem(POKE_KEY, String(Date.now()));
+  } catch (e) {}
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
 const RESEND_AFTER = 20 * 60 * 1000;   /* 未确认归档就每 20 分钟再投一次，永不放弃 */
 const MAX_PER_VISIT = 5;               /* 一次访问最多补投 5 条，别把访客的网刷爆 */
 
