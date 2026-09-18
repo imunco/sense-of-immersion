@@ -136,6 +136,59 @@ node scripts/remove-wish.mjs <id> --push                                    # �
 
 ---
 
+## 归档与持久化
+
+**实测结论：GitHub 的 `on.schedule` 在这个仓库从来没有触发过。**
+（`gh run list --event schedule` 一直是空的；public 仓库、默认分支 main、workflow state 为 active，
+两个不同的 workflow 都一样，等过 20 分钟以上。）所以归档不能只靠它。
+
+现在有四条路，按可靠性排序：
+
+| 路径 | 怎么触发 | 状态 |
+|---|---|---|
+| **本地守夜人** | Windows 计划任务每 15 分钟跑一次 `scripts/watchdog.mjs` | ✅ 主力 |
+| 任意 push | 一 push 就顺手归档一次 | ✅ |
+| 手动 | `gh workflow run collect-wishes` | ✅ |
+| GitHub 定时 | `cron: '*/5 * * * *'` | ❌ 实测从未触发 |
+
+再加两条兜底，让归档滞后也不会丢东西：
+
+- **前台和后台都直接读中转站**，所以归档慢不影响网站正常使用——蛛网和放映室都能看到最新愿望。
+- **访客浏览器里留一份**：下次打开页面时，如果这条愿望还没出现在 `wishes.jsonl` 或
+  `vault.jsonl` 里（保险库只暴露 id，所以私密愿望也能验证），就再投一次。
+  采集器按 id 去重，重复投递不会产生重复愿望。只要还有人回来，12 小时的中转缓存就不会把愿望弄丢。
+
+### 守夜人
+
+```bash
+# 看状态
+Get-ScheduledTask -TaskName yixian-archive-watchdog
+Get-Content .dsh-watchdog.log -Tail 20
+
+# 立刻归档一次
+node scripts/watchdog.mjs
+
+# 不需要了就卸载
+powershell -ExecutionPolicy Bypass -File scripts/install-watchdog.ps1 -Remove
+```
+
+它从 `.dsh-passphrase.local` 读口令（该文件在 `.gitignore` 里，不要提交），
+每一步都带重试；工作区里有已跟踪源码被改动时会自动跳过，不打断开发。
+
+### 体检与备份
+
+```bash
+node scripts/audit.mjs                                 # 中转站上的东西都落库了吗
+WISH_ADMIN_PASSPHRASE=<口令> node scripts/backup.mjs    # 解密导出到 backups/<时间戳>/
+```
+
+`audit.mjs` 列出「还在中转站、但既没进归档也没进保险库」的愿望（按内容去重的会单独说明，
+不算丢失），超过阈值（默认 60 分钟）以非零码退出，可以直接挂进计划任务报警。
+`backup.mjs` 会把公开愿望、私密愿望（解密）、待审内容导出成 JSON + CSV，并把原始密文原样拷一份。
+`backups/` 里有明文，已在 `.gitignore` 里。
+
+---
+
 ## 本地跑
 
 ```bash

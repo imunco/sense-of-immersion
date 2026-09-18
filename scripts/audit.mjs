@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sha256Hex } from '../shared/sha256.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const J = (p) => resolve(ROOT, p);
@@ -28,6 +29,13 @@ ids(await readText(J('data/private/vault.jsonl'))).forEach((i) => stored.add(i))
 ids(await readText(J('data/queue.jsonl'))).forEach((i) => stored.add(i));
 (await readJSON(J('data/blocked.json'), [])).forEach((i) => stored.add(i));
 
+/* 已归档内容的指纹：用于识别「同一条愿望被重复投递、采集器按内容去重丢弃」的情况，
+   那不是丢失，不该报警。 */
+const contentKeys = new Set();
+for (const line of (await readText(J('data/wishes.jsonl'))).split('\n').filter(Boolean)) {
+  try { const r = JSON.parse(line); contentKeys.add(sha256Hex(String(r.name) + '\u0000' + String(r.wish))); } catch {}
+}
+
 let events = [];
 try {
   const r = await fetch(endpoint + '/' + encodeURIComponent(cfg.topic) + '/json?poll=1&since=all', { headers: { 'user-agent': 'wish-silk-audit/1.0' } });
@@ -39,7 +47,9 @@ try {
       const ev = JSON.parse(line);
       if (ev.event !== 'message' || !ev.message) return;
       const w = JSON.parse(ev.message);
-      if (w && w.id) events.push({ id: w.id, time: ev.time || 0, vis: w.vis || 'public' });
+      if (!w || !w.id) return;
+      const dup = (w.name && w.wish) ? contentKeys.has(sha256Hex(String(w.name) + '\u0000' + String(w.wish))) : false;
+      events.push({ id: w.id, time: ev.time || 0, vis: w.vis || 'public', dup });
     } catch {}
   });
 } catch (e) {
@@ -48,16 +58,19 @@ try {
 }
 
 const now = Math.floor(Date.now() / 1000);
-const missing = events.filter((e) => !stored.has(e.id));
+const missing = events.filter((e) => !stored.has(e.id) && !e.dup);
+const dupCount = events.filter((e) => !stored.has(e.id) && e.dup).length;
 const byAge = missing.map((m) => ({ ...m, ageMin: Math.round((now - m.time) / 60) })).sort((a, b) => b.ageMin - a.ageMin);
 
 console.log('中转站上还能读到的消息：' + events.length + ' 条');
 console.log('仓库里已有（归档 / 保险库 / 待审 / 屏蔽）：' + stored.size + ' 条');
-console.log('还没落进仓库：' + missing.length + ' 条');
+if (dupCount) console.log('按内容去重丢弃（同一条被重复投递，不算丢失）：' + dupCount + ' 条');
+console.log('真正还没落进仓库：' + missing.length + ' 条');
 
 if (!missing.length) {
   console.log('\n✓ 中转站上的内容全部已持久化。');
-  process.exit(0);
+  process.exitCode = 0;
+  return;
 }
 
 console.log('\n未持久化的（按滞留时间从久到新）：');
@@ -69,7 +82,8 @@ if (byAge.length > 25) console.log('  …还有 ' + (byAge.length - 25) + ' 条'
 const oldest = byAge[0] ? byAge[0].ageMin : 0;
 console.log('\n最久的一条已经在中转站上等了 ' + oldest + ' 分钟；中转站在 12 小时（720 分钟）后会自动删除。');
 if (oldest >= WARN_MINUTES) {
-  console.log('⚠ 超过 ' + WARN_MINUTES + ' 分钟仍未归档，请立刻跑一次：gh workflow run collect-wishes');
-  process.exit(1);
+  console.log('⚠ 超过 ' + WARN_MINUTES + ' 分钟仍未归档，请立刻跑一次：node scripts/watchdog.mjs');
+  process.exitCode = 1;
+  return;
 }
 console.log('（暂未超过 ' + WARN_MINUTES + ' 分钟阈值，可以再等等。）');
