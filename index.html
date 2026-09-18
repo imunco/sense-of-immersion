@@ -1,1 +1,209 @@
-<!doctype html><meta charset=utf-8><title>probe</title><h1>probe</h1>
+<!doctype html>
+<html lang="zh-CN" data-thread="silk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一线千愿 · 蛛丝许愿馆</title>
+<meta name="description" content="一线千愿 —— 蛛丝很细，却挂得住一千个愿望。写下你的名字与愿望，它会变成一张还没有拍出来的电影海报，挂上蛛网。">
+<meta name="theme-color" content="#f7f4ec">
+<meta property="og:type" content="website">
+<meta property="og:title" content="一线千愿 · 蛛丝许愿馆">
+<meta property="og:description" content="蛛丝很细，却挂得住一千个愿望。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f8f5ee'/%3E%3Cpath d='M16 2v28' stroke='%23d98066' stroke-width='1.1'/%3E%3Ccircle cx='16' cy='21' r='3.6' fill='%23d98066'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://ntfy.sh" crossorigin>
+<link rel="stylesheet" href="assets/css/fonts.css">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/experience.css">
+</head>
+<body>
+
+<div class="field" aria-hidden="true"></div>
+<div class="silk-thread" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="masthead">
+  <a class="mark" href="#/">一线千愿<span class="mark__en">ONE THREAD</span></a>
+  <nav class="masthead__nav" aria-label="主导航">
+    <a href="#/web">蛛网</a>
+    <a href="#/about">关于</a>
+    <span class="masthead__live">今夜 <b id="live-count">—</b> 个愿望</span>
+  </nav>
+</header>
+
+<main id="stage">
+
+  <!-- ═══════════════════════ 第一幕 · 预告 ═══════════════════════ -->
+  <section class="act act--hero" data-view="hero" aria-labelledby="hero-title">
+    <div class="hero">
+      <p class="eyebrow hero__eyebrow">A Wish Cinema · 众人合著</p>
+      <h1 class="hero__title" id="hero-title">
+        <span class="hero__ghost" aria-hidden="true">一线千愿</span>
+        <span class="hero__ink">一线千愿</span>
+      </h1>
+      <div class="hero__reflect" aria-hidden="true">一线千愿</div>
+      <div class="hero__body">
+        <p class="hero__lede">蛛丝很细，<br>却挂得住一千个愿望。</p>
+        <div class="hero__acts">
+          <a class="btn btn--thread" href="#/cast">开始许愿</a>
+          <a class="btn btn--quiet" href="#/web">先看看蛛网</a>
+        </div>
+      </div>
+      <div class="hero__credits">
+        <span>Now Showing</span>
+        <span class="stars" aria-hidden="true">★★★★★</span>
+        <span>今夜已有 <b id="hero-count">—</b> 个愿望挂上蛛丝</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 第二幕 · 署名 ═══════════════════════ -->
+  <section class="act act--center act--cast" data-view="cast" aria-labelledby="cast-title">
+    <div class="form-shell">
+      <div class="act__head">
+        <span class="act__no">Act I</span>
+        <h2 class="act__name" id="cast-title">署名</h2>
+        <span class="act__name-en">Cast</span>
+      </div>
+      <p class="lede">在第一行，写下你的名字。<br>它会以「CAST」的身份，出现在你的海报上。</p>
+      <label class="field-label" for="name-input">Cast · 你的署名</label>
+      <input id="name-input" class="write write--name" type="text" maxlength="24" placeholder="名字或昵称" autocomplete="nickname" enterkeyhint="next">
+      <p class="cast-credit"><span>CAST</span><b id="cast-preview">—</b></p>
+      <div class="steps">
+        <button class="btn btn--thread" id="to-wish" type="button" disabled>下一步 · 许愿</button>
+        <span class="steps__hint">或按 <kbd>Enter</kbd> 继续</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 第三幕 · 许愿 ═══════════════════════ -->
+  <section class="act act--wish" data-view="wish" aria-labelledby="wish-title">
+    <div class="act__head">
+      <span class="act__no">Act II</span>
+      <h2 class="act__name" id="wish-title">许愿</h2>
+      <span class="act__name-en">The Wish</span>
+    </div>
+    <div class="wish-grid">
+      <div class="wish-form">
+        <p class="lede">现在，向蛛丝许一个愿。<br>不必宏大，一句想被听见的话就够。</p>
+        <label class="field-label" for="wish-input">The Wish · 你的愿望</label>
+        <textarea id="wish-input" class="write write--wish" maxlength="160" rows="2" placeholder="愿……" enterkeyhint="done"></textarea>
+        <div class="wish-meta">
+          <span>写下它的人：<b id="wish-author">—</b></span>
+          <span id="wish-count">0 / 160</span>
+        </div>
+
+        <fieldset class="threads">
+          <legend class="field-label">The Thread · 丝的颜色</legend>
+          <div class="threads__row" id="thread-picks"></div>
+        </fieldset>
+
+        <p class="privacy">蛛网是公开的。提交后我们会保存这条愿望、你的署名、写下它的时间，以及语言与时区这类基础信息，用于后台统计。</p>
+        <p class="wish-error" id="wish-error" role="status" aria-live="polite"></p>
+        <button class="btn btn--thread" id="submit-wish" type="button" disabled>牵起这条丝</button>
+      </div>
+
+      <div class="wish-preview">
+        <figure class="poster" id="poster-preview" data-thread="silk" aria-label="你的海报预览">
+          <div class="poster__reflect" aria-hidden="true"><span id="poster-reflect-text">愿……</span></div>
+          <div class="poster__frame">
+            <p class="poster__eyebrow">A Wish By <b id="poster-name">佚名</b></p>
+            <blockquote class="poster__title" id="poster-title">愿……</blockquote>
+            <div class="poster__rule" aria-hidden="true"></div>
+            <p class="poster__sub" id="poster-sub">"spoken at —"</p>
+            <p class="poster__meta"><span>一线千愿</span><span class="stars" aria-hidden="true">★★★★★</span><span id="poster-thread-name">蜘蛛糸</span></p>
+          </div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 第四幕 · 揭幕 ═══════════════════════ -->
+  <section class="act act--reveal" data-view="reveal" aria-labelledby="reveal-title">
+    <div class="reveal">
+      <p class="eyebrow">The Reveal</p>
+      <h2 class="reveal__line" id="reveal-title">你的愿望，已经挂上蛛丝。</h2>
+      <div class="reveal__stage">
+        <div class="reveal__thread" aria-hidden="true"></div>
+        <div class="bead" aria-hidden="true"></div>
+      </div>
+      <div class="reveal__poster" id="reveal-poster"></div>
+      <div class="reveal__credits" id="reveal-credits"></div>
+      <div class="reveal__acts">
+        <button class="btn btn--thread" id="copy-link" type="button">复制我的海报链接</button>
+        <a class="btn btn--quiet" href="#/web">去看蛛网</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 第五幕 · 蛛网 ═══════════════════════ -->
+  <section class="act act--web" data-view="web" aria-labelledby="web-title">
+    <div class="act__head">
+      <span class="act__no">Act III</span>
+      <h2 class="act__name" id="web-title">蛛网</h2>
+      <span class="act__name-en">The Web</span>
+    </div>
+    <div class="web-hud">
+      <p class="web-hud__count">丝上有 <b id="web-count">—</b> 个愿望</p>
+      <div class="chips" id="web-filters" role="group" aria-label="筛选愿望">
+        <button class="chip is-on" data-filter="all" type="button">全部</button>
+        <button class="chip" data-filter="tonight" type="button">今夜</button>
+        <button class="chip" data-filter="week" type="button">七日</button>
+        <button class="chip" data-filter="mine" type="button">我写下的</button>
+      </div>
+    </div>
+    <div class="web-wrap">
+      <canvas id="web-canvas" role="img" aria-label="挂满愿望的蛛网，点击露珠可以读到愿望"></canvas>
+      <div class="web-tip" id="web-tip" aria-hidden="true"></div>
+      <div class="web-empty" id="web-empty" hidden>
+        <p>这张网还是空的。</p>
+        <a class="btn btn--thread" href="#/cast">写下第一个愿望</a>
+      </div>
+      <ul class="sr" id="web-list" aria-label="蛛丝上的愿望"></ul>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 关于 ═══════════════════════ -->
+  <section class="act act--about" data-view="about" aria-labelledby="about-title">
+    <div class="about">
+      <div class="act__head">
+        <span class="act__no">Programme</span>
+        <h2 class="act__name" id="about-title">关于</h2>
+      </div>
+      <p>「一线千愿」是一座用蛛丝搭起来的许愿馆。你写下名字与愿望，它会被冲印成一张还没有拍出来的电影海报，然后挂到网上——成为蛛网上的一颗露珠。</p>
+      <p>它借用了两个意象：一是「一线希望」里那根细得几乎看不见的丝；二是芥川龙之介笔下，从天上垂到地狱的那根蛛丝。愿望大多实现不了，但写下它、并且知道有人读到，这件事本身是有重量的。</p>
+      <dl>
+        <dt>怎么玩</dt><dd>署名 → 许愿 → 选一种丝的颜色 → 揭幕 → 去蛛网看所有人的愿望。</dd>
+        <dt>看得见谁</dt><dd>蛛网是公开的。所有被写下的愿望都会出现在网上，按时间挂上去。</dd>
+        <dt>会记录什么</dt><dd>署名、愿望内容、时间，以及浏览器上报的语言、时区、屏幕尺寸、来源页这类基础信息。</dd>
+        <dt>后台</dt><dd>数据可以在「放映室」里按时间、关键词检索，并导出成 CSV。</dd>
+      </dl>
+      <p><a class="link-underline" href="#/cast">现在去写下你的那一句 →</a></p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="colophon">
+  <span>一线千愿 · One Thread, A Thousand Wishes</span>
+  <span>A Wish Cinema · 众人合著</span>
+  <a href="admin.html">放映室 · 后台</a>
+</footer>
+
+<div class="curtain" id="curtain" aria-hidden="true"></div>
+
+<div class="screening" id="screening" hidden>
+  <button class="btn btn--quiet screening__close" id="screening-close" type="button">关闭 ✕</button>
+  <div class="screening__inner" id="screening-inner"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<noscript>
+  <p style="padding:6rem 2rem;font-family:serif">这个许愿馆需要 JavaScript 才能把愿望冲印成海报。</p>
+</noscript>
+
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

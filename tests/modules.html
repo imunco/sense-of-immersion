@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>modules</title></head>
+<body><pre id="out">running…</pre>
+<script type="module">
+const out = document.getElementById('out');
+const list = [];
+const mods = ['config.js','fonts.js','store.js','poster.js','web.js','admin.js'];
+function log(s){ list.push(s); }
+// 只测可以安全导入的模块（app.js 会立刻开始跑流程）
+for (const m of mods) {
+  try {
+    const mod = await import('./assets/js/' + m);
+    log('OK   ' + m + '  exports=' + Object.keys(mod).length);
+  } catch (e) {
+    log('FAIL ' + m + '  ' + e.message);
+  }
+}
+// poster 渲染冒烟测试
+try {
+  const { renderPoster, fitPoster } = await import('./assets/js/poster.js');
+  const fig = renderPoster({ id:'t1', name:'测试', wish:'愿所有的努力都有回响', mood:'silk', ts:Date.now() }, {});
+  document.body.appendChild(fig);
+  fig.style.width = '640px';
+  fitPoster(fig);
+  log('OK   poster render  fit=' + fig.style.getPropertyValue('--fit') + '  title=' + fig.querySelector('.poster__title').textContent);
+} catch (e) { log('FAIL poster ' + e.message); }
+// 分享编码往返
+try {
+  const { encodeShare, decodeShare } = await import('./assets/js/store.js');
+  const rec = { name:'林深', wish:'愿有回响', mood:'abyss', ts: 1700000000000 };
+  const tok = encodeShare(rec);
+  const back = decodeShare(tok);
+  log((back && back.wish === rec.wish && back.name === rec.name ? 'OK   ' : 'FAIL ') + 'share roundtrip token=' + tok);
+} catch (e) { log('FAIL share ' + e.message); }
+out.textContent = list.join('\n');
+document.title = 'done';
+</script></body></html>

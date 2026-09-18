@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN" data-thread="abyss">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>放映室 · 一线千愿 后台</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f7f4ec">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f8f5ee'/%3E%3Cpath d='M16 2v28' stroke='%23d98066' stroke-width='1.1'/%3E%3Ccircle cx='16' cy='21' r='3.6' fill='%23d98066'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/fonts.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="field" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<section class="gate" id="gate">
+  <p class="eyebrow">Projection Room</p>
+  <h1>放映室</h1>
+  <p>这里存放着蛛丝上所有的愿望、署名与写下的时刻。请先对暗号。</p>
+  <form id="gate-form" autocomplete="off">
+    <label class="sr" for="gate-pass">口令</label>
+    <input id="gate-pass" type="password" placeholder="口令" autocomplete="current-password">
+    <p class="gate__err" id="gate-err" role="alert"></p>
+    <button class="btn btn--thread" type="submit">进入放映室</button>
+  </form>
+  <p><a class="link-underline" href="index.html">← 回到蛛网</a></p>
+</section>
+
+<div id="room" hidden>
+  <div class="admin-shell">
+
+    <header class="proj-head">
+      <div class="proj-head__title">
+        <p class="eyebrow">Projection Room</p>
+        <h1>放映室</h1>
+      </div>
+      <div class="proj-head__tools">
+        <span class="proj-status" id="proj-status">正在读取蛛丝…</span>
+        <button class="btn btn--quiet" id="refresh" type="button">刷新</button>
+        <button class="btn btn--quiet" id="export-csv" type="button">导出 CSV</button>
+        <button class="btn btn--quiet" id="export-json" type="button">导出 JSON</button>
+        <button class="btn btn--quiet" id="sign-out" type="button">退出</button>
+      </div>
+    </header>
+
+    <section class="ledger" aria-label="今夜概览">
+      <p class="ledger__sentence" id="ledger-sentence">正在数…</p>
+      <p class="ledger__line" id="ledger-line"></p>
+    </section>
+
+    <section class="timeline" aria-label="近 30 天">
+      <div class="timeline__head">
+        <p class="eyebrow">Last 30 Days</p>
+        <span class="mono" id="timeline-total"></span>
+      </div>
+      <div class="timeline__bars" id="timeline-bars"></div>
+      <div class="timeline__axis"><span id="axis-from">—</span><span>今天</span></div>
+    </section>
+
+    <section class="tools">
+      <label class="sr" for="q">搜索</label>
+      <input class="tools__search" id="q" type="search" placeholder="搜署名 / 愿望关键词…">
+      <div class="chips" id="range-chips" role="group" aria-label="时间范围">
+        <button class="chip is-on" data-range="all" type="button">全部</button>
+        <button class="chip" data-range="tonight" type="button">今夜</button>
+        <button class="chip" data-range="week" type="button">七日</button>
+        <button class="chip" data-range="live" type="button">未归档</button>
+      </div>
+      <div class="chips" role="group" aria-label="显示">
+        <button class="chip" id="toggle-hidden" type="button">显示已隐藏</button>
+      </div>
+    </section>
+
+    <div id="table-host"></div>
+
+    <p class="ledger-foot">
+      <span>数据源：data/wishes.jsonl（由 GitHub Action 每 5 分钟从中转站归档）+ ntfy 实时缓存</span>
+      <span id="foot-note"></span>
+    </p>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="愿望详情"></aside>
+
+<script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+/* ============================================================
+   一线千愿 · 设计变量 / Design tokens
+   Scene: 凌晨两点，一个人把额头贴在窗上。窗外是一片过曝的、
+   几乎发白的水面。她正在看一部还没拍出来的电影预告片，
+   而她自己的愿望，正要成为它的下一帧。
+   Theme: 光  ——  由参考图强制（浅色、发光的水面与天空）。
+   Strategy: Drenched（整个表面就是那片光）
+             + Full palette（四种丝线的命名色）。
+   ============================================================ */
+
+:root {
+  /* --- 光与水 the field ------------------------------------- */
+  --paper:      oklch(0.9745 0.0115 92);   /* 过曝的暖白纸面 */
+  --paper-warm: oklch(0.9805 0.0175 62);
+  --sky:        oklch(0.9620 0.0200 148);
+  --water:      oklch(0.9180 0.0430 187);  /* 水面的薄荷 */
+  --water-deep: oklch(0.8680 0.0560 194);
+  --water-line: oklch(0.8200 0.0450 192);
+
+  /* --- 墨 ink ------------------------------------------------ */
+  --ink:        oklch(0.3350 0.0380 205);
+  --ink-soft:   oklch(0.4800 0.0300 205);
+  --ink-faint:  oklch(0.6350 0.0210 205);
+  --ink-ghost:  oklch(0.7100 0.0160 205);
+
+  /* --- 四条丝线 the four threads ------------------------------ */
+  --silk:       oklch(0.6700 0.1300 32);   /* 蜘蛛糸 · 珊瑚 */
+  --silk-lift:  oklch(0.7450 0.1150 32);
+  --abyss:      oklch(0.5600 0.0850 197);  /* 深海 · 青 */
+  --abyss-lift: oklch(0.6600 0.0850 197);
+  --moon:       oklch(0.7450 0.0900 78);   /* 月白 · 淡金 */
+  --moon-lift:  oklch(0.8200 0.0750 78);
+  --dusk:       oklch(0.5200 0.1650 26);   /* 暮红 · 深绯 */
+  --dusk-lift:  oklch(0.6100 0.1550 26);
+
+  /* --- 线 rules & edges -------------------------------------- */
+  --rule:        color-mix(in oklab, var(--ink) 14%, transparent);
+  --rule-strong: color-mix(in oklab, var(--ink) 26%, transparent);
+  --rule-light:  color-mix(in oklab, var(--ink) 8%, transparent);
+
+  /* --- 字体 type --------------------------------------------- */
+  --font-cjk:     "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif JP", serif;
+  --font-display: "Bodoni Moda", var(--font-cjk);
+  --font-credit:  "Cinzel", var(--font-cjk);
+  --font-ui:      "Jost", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* --- 尺度 scale (≈1.26 比率) -------------------------------- */
+  --t-micro: 0.645rem;
+  --t-xs:    0.775rem;
+  --t-sm:    0.925rem;
+  --t-base:  1.0625rem;
+  --t-md:    1.325rem;
+  --t-lg:    1.70rem;
+  --t-xl:    2.25rem;
+  --t-2xl:   clamp(2.4rem, 5.4vw, 3.55rem);
+  --t-3xl:   clamp(3.2rem, 9vw, 6.4rem);
+  --t-hero:  clamp(3.6rem, 15.5vw, 12.5rem);
+
+  /* --- 呼吸 spacing ------------------------------------------ */
+  --s-1: 0.375rem;  --s-2: 0.75rem;   --s-3: 1.15rem;
+  --s-4: 1.75rem;   --s-5: 2.75rem;   --s-6: 4.25rem;
+  --s-7: 6.5rem;    --s-8: 10rem;
+
+  /* --- 动画 motion ------------------------------------------- */
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-expo:  cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out:    cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 180ms; --dur-2: 320ms; --dur-3: 620ms; --dur-4: 1100ms; --dur-5: 1900ms;
+
+  /* --- 结构 structure ---------------------------------------- */
+  --thread-x: 26%;              /* 那根从上垂下的丝的位置 */
+  --measure: 62ch;
+  --shell: min(1240px, 92vw);
+}
+
+/* 每条丝线带动整站的强调色 */
+[data-thread="silk"]  { --thread: var(--silk);  --thread-lift: var(--silk-lift); }
+[data-thread="abyss"] { --thread: var(--abyss); --thread-lift: var(--abyss-lift); }
+[data-thread="moon"]  { --thread: var(--moon);  --thread-lift: var(--moon-lift); }
+[data-thread="dusk"]  { --thread: var(--dusk);  --thread-lift: var(--dusk-lift); }
+:root { --thread: var(--silk); --thread-lift: var(--silk-lift); }

@@ -1,0 +1,264 @@
+/* ============================================================
+   基底 / Base — reset, 光场, 排版, 通用件
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  min-height: 100svh;
+  font-family: var(--font-ui);
+  font-size: var(--t-base);
+  font-weight: 350;
+  line-height: 1.62;
+  color: var(--ink);
+  background-color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* 光场：从上方的过曝纸面，落到下方的薄荷水面 ------------------- */
+.field {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background:
+    radial-gradient(120% 78% at 72% -14%, color-mix(in oklab, var(--paper-warm) 88%, transparent) 0%, transparent 62%),
+    radial-gradient(90% 60% at 12% 8%, color-mix(in oklab, var(--sky) 92%, transparent) 0%, transparent 70%),
+    linear-gradient(180deg,
+      var(--paper) 0%,
+      var(--sky) 34%,
+      color-mix(in oklab, var(--water) 62%, var(--paper)) 62%,
+      var(--water) 82%,
+      var(--water-deep) 100%);
+}
+/* 水面上的高光带 */
+.field::after {
+  content: "";
+  position: absolute;
+  left: -10%; right: -10%;
+  top: 74%;
+  height: 26%;
+  background:
+    radial-gradient(58% 100% at 22% 0%, color-mix(in oklab, white 55%, transparent) 0%, transparent 72%),
+    radial-gradient(44% 100% at 78% 12%, color-mix(in oklab, white 40%, transparent) 0%, transparent 70%);
+  opacity: 0.5;
+  filter: blur(2px);
+}
+
+/* 胶片颗粒 ------------------------------------------------------ */
+.grain {
+  position: fixed; inset: -40%;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.34;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)' opacity='0.42'/%3E%3C/svg%3E");
+  animation: grain-drift 8s steps(6, end) infinite;
+}
+@keyframes grain-drift {
+  0%   { transform: translate3d(0, 0, 0); }
+  16%  { transform: translate3d(-2%, 1%, 0); }
+  33%  { transform: translate3d(1.5%, -2%, 0); }
+  50%  { transform: translate3d(-1%, 2%, 0); }
+  66%  { transform: translate3d(2%, 1%, 0); }
+  83%  { transform: translate3d(-2%, -1%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+/* 暗角 --------------------------------------------------------- */
+.vignette {
+  position: fixed; inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  background: radial-gradient(128% 108% at 50% 40%, transparent 52%, color-mix(in oklab, var(--ink) 13%, transparent) 100%);
+}
+
+/* 从上垂下的那根丝 --------------------------------------------- */
+.silk-thread {
+  position: fixed;
+  top: 0; bottom: 0;
+  left: var(--thread-x);
+  width: 1px;
+  z-index: -2;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--thread) 42%, transparent) 12%,
+    color-mix(in oklab, var(--thread) 30%, transparent) 58%,
+    transparent 96%);
+  transform-origin: top center;
+  animation: thread-sway 13s var(--ease-in-out) infinite;
+}
+@keyframes thread-sway {
+  0%, 100% { transform: rotate(-0.14deg); }
+  50%      { transform: rotate(0.14deg); }
+}
+.silk-thread::after {
+  content: "";
+  position: absolute;
+  left: -3px; top: 11%;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff 0%, color-mix(in oklab, var(--thread) 70%, white) 42%, transparent 74%);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--thread) 55%, transparent);
+}
+
+/* ---------------------------------------------------------------- 排版 */
+h1, h2, h3 { font-weight: 400; line-height: 1.02; }
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 0.92;
+}
+.display-cjk {
+  font-family: var(--font-cjk);
+  font-weight: 900;
+  letter-spacing: 0.005em;
+  line-height: 0.94;
+}
+.eyebrow {
+  font-family: var(--font-credit);
+  font-weight: 500;
+  font-size: var(--t-xs);
+  letter-spacing: 0.44em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--thread) 82%, var(--ink));
+  text-indent: 0.44em;
+}
+.credit {
+  font-family: var(--font-credit);
+  font-size: var(--t-sm);
+  letter-spacing: 0.30em;
+  text-indent: 0.30em;
+  color: var(--ink-soft);
+}
+.lede {
+  font-family: var(--font-cjk);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 2.1vw, 1.42rem);
+  line-height: 1.95;
+  letter-spacing: 0.055em;
+  color: var(--ink-soft);
+  max-width: 34ch;
+}
+.mono {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-xs);
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- 交互件 */
+.btn {
+  --btn-ink: var(--ink);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.95em 2.1em;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: color-mix(in oklab, white 42%, transparent);
+  color: var(--btn-ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  font-weight: 450;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out-quart),
+              border-color var(--dur-2) var(--ease-out-quart),
+              transform var(--dur-2) var(--ease-out-quart),
+              box-shadow var(--dur-2) var(--ease-out-quart);
+}
+.btn:hover, .btn:focus-visible {
+  background: color-mix(in oklab, white 74%, transparent);
+  border-color: var(--thread);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -18px color-mix(in oklab, var(--ink) 60%, transparent);
+}
+.btn:active { transform: translateY(0); }
+.btn[disabled] { opacity: 0.42; pointer-events: none; }
+
+.btn--thread {
+  border-color: transparent;
+  background: var(--thread);
+  color: oklch(0.99 0.006 92);
+  box-shadow: 0 14px 34px -20px color-mix(in oklab, var(--thread) 88%, transparent);
+}
+.btn--thread:hover, .btn--thread:focus-visible {
+  background: var(--thread-lift);
+  border-color: transparent;
+}
+
+.btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  padding-inline: 1.1em;
+  color: var(--ink-soft);
+}
+.btn--quiet:hover { background: color-mix(in oklab, white 55%, transparent); border-color: transparent; }
+
+.link-underline {
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule-strong);
+  padding-bottom: 1px;
+  transition: color var(--dur-1) var(--ease-out-quart), border-color var(--dur-1) var(--ease-out-quart);
+}
+.link-underline:hover { color: var(--thread); border-color: var(--thread); }
+
+:focus-visible { outline: 2px solid var(--thread); outline-offset: 3px; }
+
+/* 输入 --------------------------------------------------------- */
+.field-label {
+  display: block;
+  font-family: var(--font-credit);
+  font-size: var(--t-xs);
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: var(--s-2);
+}
+.write {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-cjk);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 0.5em 0 0.55em;
+  transition: border-color var(--dur-2) var(--ease-out-quart);
+}
+.write:focus { outline: none; border-color: var(--thread); }
+.write::placeholder { color: var(--ink-ghost); }
+.write--name { font-size: clamp(1.9rem, 5.4vw, 3.4rem); }
+.write--wish {
+  font-size: clamp(1.35rem, 3.1vw, 2.1rem);
+  line-height: 1.7;
+  resize: none;
+  min-height: 3.6em;
+  overflow: hidden;
+}
+
+/* 屏幕外的语义文本 */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .grain, .silk-thread { animation: none !important; }
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 60ms !important; }
+}
