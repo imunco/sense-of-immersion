@@ -1,0 +1,27 @@
+name: heartbeat
+
+# 只为验证 GitHub 的 schedule 是否会在本仓库触发。验证完可以删掉这个文件。
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 写一行心跳
+        run: |
+          mkdir -p data
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) schedule" >> data/heartbeat.log
+      - name: 提交
+        run: |
+          git config user.name "heartbeat"
+          git config user.email "heartbeat@users.noreply.github.com"
+          git add data/heartbeat.log
+          git commit -q -m "heartbeat: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push --quiet
