@@ -1,0 +1,13 @@
+{
+  "name": "yixian-archive",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "一线千愿的归档触发服务（Vercel Functions + Cron）",
+  "scripts": {
+    "collect": "node scripts/collect.mjs",
+    "watchdog": "node scripts/watchdog.mjs",
+    "audit": "node scripts/audit.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}

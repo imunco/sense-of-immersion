@@ -7,8 +7,12 @@
 backups/
 .dsh-watchdog.log
 
+.vercel/
 node_modules/
 tests/shots/
 package-lock.json
 .DS_Store
 Thumbs.db
+
+.vercel
+.env*

@@ -4,8 +4,8 @@ export const FALLBACK = {
   endpoint: 'https://ntfy.sh',
   title: '一线千愿',
   subtitle: 'One Thread, A Thousand Wishes',
-  /* 归档触发器（Vercel 函数）。留空则不改用外部触发，只靠 push / 守夜人。 */
-  pokeUrl: '',
+  /* 归档触发器（Vercel 函数）。留空则只用 push / 守夜人 / GitHub 定时。 */
+  pokeUrl: 'https://yixian-archive.vercel.app/api/poke',
   /* 站点公钥：只能用来加密，公开无所谓 */
   siteKey: {"kty":"EC","crv":"P-256","x":"84zqpZW40I7kRX8aWZbwlKQKkISjwAcR2kOvYemaAcQ","y":"DIvQxdJ26rRBzUVR9f0CahKk8WyW7fu2ooN55Eg1Kqk"},
   proofOfWork: { difficulty: 4 }
