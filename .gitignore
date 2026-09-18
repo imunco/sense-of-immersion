@@ -1,3 +1,10 @@
+# 仓库根目录的临时脚本 —— 绝不要让它们进仓库（曾经把一个带 PAT 的 1.ps1 提交进来过）
+/*.ps1
+/*.sh
+/*.cmd
+/*.bat
+/*.log
+
 # 绝不要提交任何本地口令文件
 .dsh-passphrase.local
 *.passphrase
