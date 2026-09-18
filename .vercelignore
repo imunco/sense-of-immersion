@@ -1,10 +1,18 @@
-# Vercel 只用来跑 /api 的归档触发，站点本体在 GitHub Pages
-admin.html
-index.html
-assets/
-data/
-scripts/
-tests/
-shared/
-backups/
-*.md
+# Vercel 只用来跑 /api 的归档触发；站点本体在 GitHub Pages。
+# 注意：这里用 .gitignore 语义，不带斜杠的模式会匹配任意层级，
+# 所以必须用前导 / 锚定到仓库根 —— 否则 'index.html' 会把 public/index.html 也排掉，
+# 结果根路径返回 404。
+/.github
+/.dsh-passphrase.local
+/index.html
+/admin.html
+/assets
+/data
+/scripts
+/tests
+/shared
+/backups
+/*.md
+/.vercel
+/node_modules
+/package-lock.json
