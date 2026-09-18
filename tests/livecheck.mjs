@@ -11,7 +11,8 @@ page.on('requestfailed', (r) => problems.push('reqfail: ' + r.url().slice(0, 90)
 await page.setViewport({ width: 1440, height: 900 });
 await page.goto(BASE + '/', { waitUntil: 'networkidle2', timeout: 90000 });
 await page.evaluate(() => document.fonts.ready).catch(() => {});
-await wait(3500);
+await page.waitForFunction(() => !!window.__yixian, { timeout: 40000 }).catch(() => {});
+await wait(800);
 console.log('前台:', JSON.stringify(await page.evaluate(() => ({
   cjk: document.documentElement.dataset.cjk,
   heroCount: document.querySelector('#hero-count').textContent,
@@ -30,7 +31,9 @@ await page.goto(BASE + '/admin.html', { waitUntil: 'networkidle2' });
 await wait(1200);
 await page.type('#gate-pass', 'yixian-2026', { delay: 25 });
 await page.click('#gate-form button[type=submit]');
-await wait(3200);
+await page.waitForFunction(() => !document.querySelector('#room').hidden, { timeout: 60000 });
+await page.waitForFunction(() => !/正在解密/.test(document.querySelector('#proj-status').textContent), { timeout: 60000 });
+await wait(800);
 console.log('后台:', JSON.stringify(await page.evaluate(() => ({
   roomVisible: !document.querySelector('#room').hidden,
   rows: document.querySelectorAll('.ledger-table tbody tr').length,

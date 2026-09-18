@@ -482,8 +482,12 @@ async function boot() {
 
   render();
 
-  await loadAll();
-  flushPending().then(function (n) { if (n) toast('补发了 ' + n + ' 条愿望'); });
+  try {
+    await loadAll();
+  } catch (e) {
+    counts(); /* 数据层出问题也不能让页面停在半路 */
+  }
+  flushPending().then(function (n) { if (n) toast('补发了 ' + n + ' 条愿望'); }).catch(function () {});
   state.booted = true;
 
   setInterval(tick, 15000);
