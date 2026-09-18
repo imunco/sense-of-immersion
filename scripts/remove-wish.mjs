@@ -11,7 +11,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ids = process.argv.slice(2).filter(Boolean);
+const argv = process.argv.slice(2);
+const push = argv.includes('--push');
+const ids = argv.filter((a) => a !== '--push').filter(Boolean);
 if (!ids.length) { console.error('用法: node scripts/remove-wish.mjs <id> [...]'); process.exit(1); }
 
 const arch = resolve(ROOT, 'data/wishes.jsonl');
@@ -28,3 +30,14 @@ const merged = Array.from(new Set(blocked.concat(ids)));
 await writeFile(blockedPath, JSON.stringify(merged, null, 2) + '\n');
 
 console.log('删除 ' + (lines.length - kept.length) + ' 条，剩余 ' + kept.length + ' 条；已加入屏蔽名单。');
+if (push) {
+  const { execFileSync } = await import('node:child_process');
+  try {
+    execFileSync('git', ['add', 'data'], { stdio: 'inherit' });
+    try { execFileSync('git', ['commit', '-m', 'remove: 删除愿望 ' + ids.join(' ')], { stdio: 'inherit' }); } catch {}
+    execFileSync('git', ['push', 'origin', 'main'], { stdio: 'inherit' });
+    console.log('已推送，约一分钟后对所有人生效。');
+  } catch (e) { console.error('推送失败，请手动处理：' + e.message); }
+} else {
+  console.log('（加 --push 可以直接提交并推送）');
+}

@@ -36,6 +36,16 @@ export async function deriveKey(passphrase, saltB64, iterations) {
   );
 }
 
+/* 数据密钥（DEK）：随机生成的 AES 密钥，用它加密所有记录；
+   口令只负责把 DEK 包起来。这样换口令时只需重新包一次，历史数据不会丢。 */
+export async function importAesKey(b64) {
+  return crypto.subtle.importKey('raw', fromB64(b64), { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+export async function newAesKey() {
+  return toB64(crypto.getRandomValues(new Uint8Array(32)));
+}
+
 export async function encryptJSON(key, value) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, te.encode(JSON.stringify(value)));

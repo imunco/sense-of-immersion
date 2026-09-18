@@ -194,12 +194,15 @@ export async function mineProof(id, difficulty, onProgress) {
   }
 }
 
-/* ---------------------------------------------------------- 密封元数据 */
-export async function sealMeta(meta) {
+/* ---------------------------------------------------------- 密封给站点
+   任何内容用站点公钥封上之后，只有拿得出后台口令的人能拆开。
+   元数据走这条路；选择「仅自己可见」的愿望，正文也走这条路。 */
+export async function seal(value) {
   const pub = cfg.siteKey || FALLBACK.siteKey;
   if (!pub) return null;
-  try { return await sealForSite(pub, meta); } catch (e) { return null; }
+  try { return await sealForSite(pub, value); } catch (e) { return null; }
 }
+export const sealMeta = seal;
 
 /* ---------------------------------------------------------- 中转站 */
 export async function publish(payload) {

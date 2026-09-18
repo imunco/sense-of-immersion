@@ -7,6 +7,7 @@
    · ⚠️ 愿望正文本身是公开的（产品设定），口令保护的是基本信息，不是愿望 */
 import { loadConfig, loadArchive, loadBlocked, poll, merge, config } from './store.js';
 import { deriveKey, decryptJSON } from '../../shared/crypto.js';
+import { unwrapKeyring } from '../../shared/keyring.js';
 import { openFromSite } from '../../shared/envelope.js';
 import { THREADS, threadById } from './config.js';
 import { mountPoster, fullDate, speakingTime, relTime } from './poster.js';
@@ -18,8 +19,9 @@ const HK = 'yixian.hidden.v1';
 const LK = 'yixian.lock.v2';
 const IDLE_MS = 30 * 60 * 1000;
 
-let KEY = null;       /* 口令派生密钥，只在内存 */
-let PRIV = null;      /* 站点私钥，只在内存 */
+let KEY = null;       /* 口令派生密钥（KEK），只在内存 */
+let DEK = null;       /* 数据密钥，解开发记录用，只在内存 */
+let PRIV = null;      /* 站点私钥，拆中转站上的信封用，只在内存 */
 
 const state = {
   rows: [], queue: [], filter: 'all', q: '', sort: 'desc', showHidden: false,
@@ -71,13 +73,18 @@ async function unlock(pass) {
     if (!v || !v.ok) throw new Error('bad');
   } catch (e) { return { ok: false, msg: '口令不对。' }; }
   KEY = key;
-  try { PRIV = await decryptJSON(key, await fetchJSON('data/private/keys.json')); } catch (e) { PRIV = null; }
+  try {
+    const kr = await unwrapKeyring(key, await fetchJSON('data/private/keys.json'));
+    DEK = kr.dek;
+    PRIV = kr.sitePrivateJwk;
+  } catch (e) { DEK = null; PRIV = null; }
   return { ok: true };
 }
 
 /* ---------------------------------------------------------- 解密元数据 */
 async function decryptLines(path) {
   let text = '';
+  if (!DEK) return { items: [], failed: 0 };
   try { text = await (await fetch(path, { cache: 'no-store' })).text(); } catch (e) { return { items: [], failed: 0 }; }
   const items = text.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
   const out = [];
@@ -85,7 +92,7 @@ async function decryptLines(path) {
   const CHUNK = 150;
   for (let i = 0; i < items.length; i += CHUNK) {
     const done = await Promise.all(items.slice(i, i + CHUNK).map(async (rec) => {
-      try { return Object.assign({ id: rec.id }, await decryptJSON(KEY, rec.e)); }
+      try { return Object.assign({ id: rec.id }, await decryptJSON(DEK, rec.e)); }
       catch (e) { return null; }
     }));
     done.forEach((d) => { if (d) out.push(d); else failed++; });
@@ -107,6 +114,14 @@ async function load() {
   metaRes.items.forEach((m) => metas.set(m.id, m));
 
   state.rows = archive.map((r) => Object.assign({}, r, metas.get(r.id) || {}));
+
+  /* 「仅自己可见」的愿望：仓库里是密文，这里用数据密钥解开 */
+  const vaultRes = await decryptLines('data/private/vault.jsonl');
+  state.privateCount = vaultRes.items.length;
+  state.privateFailed = vaultRes.failed;
+  vaultRes.items.forEach((v) => {
+    state.rows.push(Object.assign({}, v, v.meta || {}, { __private: true }));
+  });
 
   /* 队列：命中审查规则、还没上墙的 */
   const queueRes = KEY ? await decryptLines('data/queue.jsonl') : { items: [], failed: 0 };
@@ -153,6 +168,7 @@ function visible() {
   if (state.filter === 'tonight') rows = rows.filter((r) => (r.ts || 0) >= today);
   else if (state.filter === 'week') rows = rows.filter((r) => (r.ts || 0) >= now - 7 * 864e5);
   else if (state.filter === 'live') rows = rows.filter((r) => state.liveIds.has(r.id));
+  else if (state.filter === 'private') rows = rows.filter((r) => r.__private);
   if (state.q) {
     const q = state.q.toLowerCase();
     rows = rows.filter((r) => (r.name + ' ' + r.wish + ' ' + (r.tz || '') + ' ' + (r.ua || '')).toLowerCase().indexOf(q) >= 0);
@@ -185,6 +201,7 @@ function renderLedger() {
   line.textContent = '';
   [['总计', rows.length + ' 条'], ['独立设备', devices + ' 台'], ['平均', avg + ' 字'], ['最长', longest + ' 字'],
    ['未归档', liveCount + ' 条'], ['待审', state.queue.length + ' 条'],
+   ['仅自己可见', (state.privateCount || 0) + ' 条'],
    ['元数据', state.metaOk + ' 条' + (state.metaFail ? '（' + state.metaFail + ' 条解不开）' : '')]
   ].forEach((pair) => {
     const s = document.createElement('span');
@@ -318,6 +335,11 @@ function renderTable() {
     const tdWish = document.createElement('td');
     tdWish.className = 'cell-wish';
     tdWish.textContent = r.wish;
+    if (r.__private) {
+      const t = tag('仅自己可见');
+      t.classList.add('tag-priv');
+      tdWish.insertBefore(t, tdWish.firstChild);
+    }
     if (state.blocked.has(r.id)) {
       tdWish.appendChild(tag('已屏蔽'));
     } else if (state.liveIds.has(r.id)) {
@@ -409,6 +431,7 @@ function openDrawer(r) {
     ['来访次数', r.n ? '第 ' + r.n + ' 次' : '（未解密）'],
     ['设备标识', r.dv || '（未解密）'],
     ['入口', r.src || 'web'],
+    ['可见性', r.__private ? '仅自己可见（端到端加密）' : '公开'],
     ['归档', state.blocked.has(r.id) ? '已屏蔽（不进蛛网）' : (state.liveIds.has(r.id) ? '尚未归档（等采集器写入）' : '已归档')]
   ];
   rows.forEach((pair) => {

@@ -268,3 +268,7 @@
 .queue__wish b { font-weight: 700; margin-right: 0.2em; }
 .queue__why { font-family: var(--font-cjk); font-size: var(--t-xs); letter-spacing: 0.06em; color: var(--dusk); }
 .queue__acts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: 0.2em; }
+.tag-priv {
+  border-color: color-mix(in oklab, var(--dusk) 48%, transparent);
+  color: var(--dusk);
+}

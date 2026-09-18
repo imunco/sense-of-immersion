@@ -599,3 +599,37 @@
   .act { padding-top: 5.5rem; }
   .reveal__poster { width: 100%; }
 }
+/* ---------------------------------------------------------- 可见性选择 */
+.vis { border: 0; padding: 0; margin: var(--s-5) 0 0; }
+.vis__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.vis-pick {
+  display: grid;
+  gap: 0.35em;
+  text-align: left;
+  padding: 0.95em 1.05em;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out-quart), background var(--dur-2) var(--ease-out-quart);
+}
+.vis-pick b { font-family: var(--font-cjk); font-weight: 700; font-size: var(--t-sm); letter-spacing: 0.12em; color: var(--ink); }
+.vis-pick small { font-family: var(--font-ui); font-size: var(--t-micro); line-height: 1.7; letter-spacing: 0.06em; color: var(--ink-faint); }
+.vis-pick:hover { border-color: var(--thread); }
+.vis-pick.is-on {
+  border-color: var(--thread);
+  background: color-mix(in oklab, var(--thread) 10%, transparent);
+}
+.reveal__note {
+  max-width: 46ch;
+  font-family: var(--font-cjk);
+  font-size: var(--t-sm);
+  line-height: 2;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.reveal__note b { color: var(--dusk); font-weight: 700; }
+@media (max-width: 620px) {
+  .vis__row { grid-template-columns: 1fr; }
+}

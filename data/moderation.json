@@ -15,7 +15,8 @@
     "perContentPerDay": 1,
     "archiveCap": 20000,
     "anonymousPerHour": 20,
-    "_note": "perDevicePerHour 需要浏览器送来可解密的设备标识；没有标识的（匿名桶）用 anonymousPerHour 这个更紧的上限"
+    "_note": "perDevicePerHour 依赖客户端自报设备号（可伪造）；globalPerHour 是服务端强制的全站上限，不依赖任何客户端字段",
+    "globalPerHour": 240
   },
   "proofOfWork": {
     "difficulty": 4

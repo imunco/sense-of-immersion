@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * 采集器 / The Collector —— 同时是审查与限流的执行点。
+ * 采集器 / The Collector —— 唯一能把内容写进仓库的角色，所有防护都在这里落地。
  *
- * 它是唯一能把内容写进公开归档的角色，所以所有防护都在这里落地：
- *   1. 校验   —— 形状、长度、字符集、字体、时间戳
- *   2. 工作量证明 —— 每条愿望必须带一个挖出来的 nonce（挡脚本批量灌）
- *   3. 内容审查 —— 违禁词、链接、重复字符、纯符号 → 隔离待审，不直接上墙
- *   4. 限流   —— 每设备每小时、每内容每日、每次运行总量、归档总量上限
- *   5. 隐私   —— 采集到的「基本信息」用后台口令派生密钥加密后才落盘
+ *   校验 → 工作量证明 → 内容审查 → 限流 → 分流
+ *
+ * 分流三条路：
+ *   public  → data/wishes.jsonl          （公开挂上蛛网）
+ *   private → data/private/vault.jsonl   （端到端加密，只有后台口令能解开）
+ *   命中规则 → data/queue.jsonl          （隔离待审，整条加密，不上墙）
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex } from '../shared/sha256.js';
-import { deriveKey, encryptJSON, decryptJSON } from '../shared/crypto.js';
+import { deriveKey, encryptJSON } from '../shared/crypto.js';
+import { unwrapKeyring } from '../shared/keyring.js';
 import { openFromSite } from '../shared/envelope.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,11 +23,13 @@ const J = (p) => resolve(ROOT, p);
 const readText = async (p, d = '') => (existsSync(p) ? readFile(p, 'utf8') : d);
 const readJSON = async (p, d) => { try { return JSON.parse(await readText(p)); } catch { return d; } };
 const writeJSON = async (p, v) => writeFile(p, JSON.stringify(v, null, 2) + '\n');
+const lines = (t) => t.split('\n').filter(Boolean);
+const parseLines = (t) => lines(t).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 
 const cfg = await readJSON(J('data/config.json'), {});
 const mod = await readJSON(J('data/moderation.json'), {});
 const L = Object.assign({ nameMin: 1, nameMax: 24, wishMin: 2, wishMax: 160, maxLinks: 0, maxRepeatRun: 8 }, mod.limits || {});
-const R = Object.assign({ perDevicePerHour: 6, anonymousPerHour: 20, perRunLimit: 120, perContentPerDay: 1, archiveCap: 20000 }, mod.rate || {});
+const R = Object.assign({ perDevicePerHour: 6, anonymousPerHour: 20, globalPerHour: 240, perRunLimit: 120, perContentPerDay: 1, archiveCap: 20000 }, mod.rate || {});
 const POW_BITS = (mod.proofOfWork && mod.proofOfWork.difficulty) || 4;
 const POW_PREFIX = '0'.repeat(POW_BITS);
 const BANNED = (mod.bannedWords || []).map((w) => String(w).toLowerCase()).filter(Boolean);
@@ -49,118 +52,91 @@ function sameRatio(s) {
   return best / s.length;
 }
 const isJunk = (s) => !/[\p{L}\p{N}]/u.test(s);
+const dh = (v) => sha256Hex('k:' + String(v) + ':' + ((cfg.crypto && cfg.crypto.salt) || 'nosalt')).slice(0, 24);
 
 /* ---------------------------------------------------------------- 密钥 */
-let key = null;
-let privateJwk = null;
+let dek = null, privateJwk = null;
 if (PASSPHRASE && cfg.crypto && cfg.crypto.salt) {
-  key = await deriveKey(PASSPHRASE, cfg.crypto.salt, cfg.crypto.iterations);
   try {
-    privateJwk = await decryptJSON(key, JSON.parse(await readText(J('data/private/keys.json'), 'null')));
-  } catch {
-    console.warn('⚠ 解不开 data/private/keys.json —— 元数据将无法解密，只归档公开部分。');
+    const kek = await deriveKey(PASSPHRASE, cfg.crypto.salt, cfg.crypto.iterations);
+    const opened = await unwrapKeyring(kek, await readJSON(J('data/private/keys.json'), null));
+    dek = opened.dek;
+    privateJwk = opened.sitePrivateJwk;
+  } catch (e) {
+    console.error('⚠ 密钥环打不开（口令不对？）—— 本次不保存元数据与私密愿望，只归档公开部分。');
   }
 } else {
-  console.warn('⚠ 没有 WISH_ADMIN_PASSPHRASE —— 本次不保存「基本信息」，只归档公开部分。');
-  console.warn('  设置：gh secret set WISH_ADMIN_PASSPHRASE --body "<口令>"');
+  console.error('⚠ 没有 WISH_ADMIN_PASSPHRASE —— 不保存元数据与私密愿望，只归档公开部分。');
+  console.error('  设置：gh secret set WISH_ADMIN_PASSPHRASE --body "<口令>"');
 }
 
 /* ---------------------------------------------------------------- 状态 */
 const archivePath = J('data/wishes.jsonl');
+const vaultPath = J('data/private/vault.jsonl');
+const queuePath = J('data/queue.jsonl');
+const metaPath = J('data/private/meta.jsonl');
+
 const blocked = new Set(await readJSON(J('data/blocked.json'), []));
-const existingLines = (await readText(archivePath)).split('\n').filter(Boolean);
+const existing = parseLines(await readText(archivePath));
 const byId = new Map();
 const seenIds = new Set();
 const seenContent = new Set();
-for (const line of existingLines) {
-  try {
-    const r = JSON.parse(line);
-    byId.set(r.id, r);
-    seenIds.add(r.id);
-    seenContent.add(sha256Hex(String(r.name) + '\u0000' + String(r.wish)));
-  } catch {}
-}
-const queuePath = J('data/queue.jsonl');
-const queueKnown = new Set((await readText(queuePath)).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l).id; } catch { return null; } }).filter(Boolean));
-for (const id of queueKnown) seenIds.add(id);
-
-const metaPath = J('data/private/meta.jsonl');
-const metaKnown = new Set((await readText(metaPath)).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l).id; } catch { return null; } }).filter(Boolean));
+for (const r of existing) { byId.set(r.id, r); seenIds.add(r.id); seenContent.add(sha256Hex(String(r.name) + '\u0000' + String(r.wish))); }
+for (const r of parseLines(await readText(queuePath))) seenIds.add(r.id);
+for (const r of parseLines(await readText(vaultPath))) seenIds.add(r.id);
+const metaKnown = new Set(parseLines(await readText(metaPath)).map((r) => r.id));
+const vaultKnown = new Set(parseLines(await readText(vaultPath)).map((r) => r.id));
 
 const rlPath = J('data/private/ratelimit.json');
-const rl = await readJSON(rlPath, { devices: {}, content: {}, total: 0 });
-rl.devices = rl.devices || {}; rl.content = rl.content || {};
+const rl = await readJSON(rlPath, { devices: {}, content: {}, global: [], total: 0 });
+rl.devices = rl.devices || {}; rl.content = rl.content || {}; rl.global = rl.global || [];
 const HOUR = 3600e3, DAY = 86400e3;
 const now = Date.now();
-const dh = (dv) => sha256Hex('dv:' + String(dv) + ':' + (cfg.crypto && cfg.crypto.salt || 'nosalt')).slice(0, 24);
 for (const k of Object.keys(rl.devices)) { rl.devices[k] = rl.devices[k].filter((t) => now - t < DAY); if (!rl.devices[k].length) delete rl.devices[k]; }
 for (const k of Object.keys(rl.content)) { rl.content[k] = rl.content[k].filter((t) => now - t < DAY); if (!rl.content[k].length) delete rl.content[k]; }
+rl.global = rl.global.filter((t) => now - t < HOUR);
 
 /* ---------------------------------------------------------------- 拉取 */
 const cursorObj = await readJSON(J('data/cursor.json'), { since: 'all' });
 const since = cursorObj.since === 'all' ? 'all' : Math.max(0, Number(cursorObj.since) - 180);
-const url = ENDPOINT + '/' + encodeURIComponent(TOPIC) + '/json?poll=1&since=' + since;
-const res = await fetch(url, { headers: { 'user-agent': 'wish-silk-collector/2.0' } });
+const res = await fetch(ENDPOINT + '/' + encodeURIComponent(TOPIC) + '/json?poll=1&since=' + since, { headers: { 'user-agent': 'wish-silk-collector/3.0' } });
 if (!res.ok) { console.error('拉取失败', res.status); process.exit(1); }
 const body = await res.text();
 
-/* ---------------------------------------------------------------- 逐条审 */
-const accepted = [], quarantined = [], metaOut = [];
-const stats = { in: 0, ok: 0, bad_shape: 0, bad_pow: 0, bot: 0, banned: 0, link: 0, junk: 0, repeat: 0, dup: 0, rate: 0, flood: 0, blocked: 0, dup_id: 0 };
+/* ---------------------------------------------------------------- 审查 */
+const stats = { in: 0, ok: 0, priv: 0, bad_shape: 0, bad_pow: 0, bad_seal: 0, bot: 0, dup: 0, rate: 0, flood: 0, blocked: 0, dup_id: 0, meta_lost: 0 };
+const accepted = [], quarantined = [], metaOut = [], vaultOut = [];
 let maxTime = Number(cursorObj.since) || 0;
+const bump = (k) => { stats[k] = (stats[k] || 0) + 1; };
 
-function reject(reason) { stats[reason] = (stats[reason] || 0) + 1; }
-
-function vet(w) {
+/* 只做形状/凭证校验；内容相关的一律等取到真内容之后再审 */
+function vetShape(w) {
   if (!w || typeof w !== 'object') return { drop: 'bad_shape' };
   const id = String(w.id || '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 40);
   if (!/^w_[a-z0-9_]{4,40}$/i.test(id)) return { drop: 'bad_shape' };
-  const name = norm(w.name, L.nameMax + 1);
-  const wish = norm(w.wish, L.wishMax + 1);
-  if (!name || name.length < L.nameMin || name.length > L.nameMax) return { drop: 'bad_shape' };
-  if (!wish || wish.length < L.wishMin || wish.length > L.wishMax) return { drop: 'bad_shape' };
-
-  /* 工作量证明 */
   const pow = String(w.pow == null ? '' : w.pow).slice(0, 24);
   if (!/^[A-Za-z0-9]{1,24}$/.test(pow)) return { drop: 'bad_pow' };
   if (sha256Hex(id + '|' + pow).slice(0, POW_BITS) !== POW_PREFIX) return { drop: 'bad_pow' };
-
-  /* 蜜罐与填写时长 */
   if (w.hp) return { drop: 'bot' };
   const ft = Number(w.ft);
   if (Number.isFinite(ft) && ft < 2000) return { drop: 'bot' };
+  const vis = w.vis === 'private' ? 'private' : 'public';
+  if (vis === 'private' && (!w.prv || typeof w.prv !== 'object')) return { drop: 'bad_seal' };
+  return { ok: true, id, vis, ref: w };
+}
 
-  const mood = MOODS.includes(w.mood) ? w.mood : 'silk';
-  let ts = Number(w.ts);
-  if (!Number.isFinite(ts) || ts < now - 30 * DAY || ts > now + DAY) ts = now;
-
+/* 内容审查：公开与私密一视同仁 */
+function reviewContent(name, wish) {
   const text = name + ' ' + wish;
   const lower = text.toLowerCase();
-  let why = null;
-
-  const hits = BANNED.filter((b) => lower.includes(b));
-  if (hits.length) why = '违禁词：' + hits.slice(0, 3).join('、');
-
+  const hits = BANNED.filter((b) => lower.indexOf(b) >= 0);
+  if (hits.length) return '违禁词：' + hits.slice(0, 3).join('、');
   const links = (text.match(/(?:https?:\/\/|www\.|t\.me\/|\b\d{1,3}(?:\.\d{1,3}){3}\b)/gi) || []).length;
-  if (!why && links > L.maxLinks) why = '包含 ' + links + ' 个链接';
-
-  if (!why && isJunk(wish)) why = '没有任何文字内容';
-  if (!why && runOf(text) > L.maxRepeatRun) why = '重复字符过多';
-  if (!why && sameRatio(text) > 0.75 && text.length > 8) why = '单一字符占比过高';
-
-  const contentHash = sha256Hex(name + '\u0000' + wish);
-  if (seenContent.has(contentHash)) return { drop: 'dup' };
-  const cTimes = rl.content[contentHash] || [];
-  if (cTimes.filter((t) => now - t < DAY).length >= R.perContentPerDay) return { drop: 'dup' };
-
-  /* 每设备限流要等信封拆开、拿到稳定的设备标识之后再做（见主循环） */
-  return {
-    ok: true,
-    id, name, wish, mood, ts,
-    contentHash,
-    quarantine: why || null,
-    env: w.env || null
-  };
+  if (links > L.maxLinks) return '包含 ' + links + ' 个链接';
+  if (isJunk(wish)) return '没有任何文字内容';
+  if (runOf(text) > L.maxRepeatRun) return '重复字符过多';
+  if (sameRatio(text) > 0.75 && text.length > 8) return '单一字符占比过高';
+  return null;
 }
 
 for (const line of body.split('\n')) {
@@ -170,104 +146,132 @@ for (const line of body.split('\n')) {
   if (ev.time && ev.time > maxTime) maxTime = ev.time;
   stats.in++;
 
-  let raw; try { raw = JSON.parse(ev.message); } catch { reject('bad_shape'); continue; }
-  const v = vet(raw);
-  if (v.drop) { reject(v.drop); continue; }
-  if (blocked.has(v.id)) { stats.blocked++; continue; }
-  if (seenIds.has(v.id)) { stats.dup_id++; continue; }
+  let raw; try { raw = JSON.parse(ev.message); } catch { bump('bad_shape'); continue; }
+  const shape = vetShape(raw);
+  if (shape.drop) { bump(shape.drop); continue; }
+  const id = shape.id;
+  if (blocked.has(id)) { stats.blocked++; continue; }
+  if (seenIds.has(id)) { stats.dup_id++; continue; }
+  if (accepted.length + vaultOut.length + 1 > R.perRunLimit) { stats.flood++; continue; }
 
-  if (accepted.length + 1 > R.perRunLimit) { stats.flood++; continue; }
-
-  seenIds.add(v.id);
-  seenContent.add(v.contentHash);
-  rl.content[v.contentHash] = (rl.content[v.contentHash] || []).concat([now]);
-  stats.ok++;
-
-  /* 拆信封 —— 元数据只在被授权的采集器里短暂以明文存在 */
-  let meta = null;
-  let envelopeBroken = false;
-  if (key && privateJwk && v.env) {
+  /* 取真内容 */
+  let name, wish, mood, ts;
+  if (shape.vis === 'private') {
+    if (!privateJwk) { bump('bad_seal'); continue; }
     try {
-      const m = await openFromSite(privateJwk, v.env);
+      const p = await openFromSite(privateJwk, raw.prv);
+      name = norm(p.name, L.nameMax + 1);
+      wish = norm(p.wish, L.wishMax + 1);
+      mood = MOODS.includes(p.mood) ? p.mood : 'silk';
+      ts = Number(p.ts);
+    } catch { bump('bad_seal'); continue; }
+  } else {
+    name = norm(raw.name, L.nameMax + 1);
+    wish = norm(raw.wish, L.wishMax + 1);
+    mood = MOODS.includes(raw.mood) ? raw.mood : 'silk';
+    ts = Number(raw.ts);
+  }
+  if (!name || name.length < L.nameMin || name.length > L.nameMax) { bump('bad_shape'); continue; }
+  if (!wish || wish.length < L.wishMin || wish.length > L.wishMax) { bump('bad_shape'); continue; }
+  if (!Number.isFinite(ts) || ts < now - 30 * DAY || ts > now + DAY) ts = now;
+
+  let why = reviewContent(name, wish);
+
+  /* 内容去重 */
+  const contentHash = sha256Hex(name + '\u0000' + wish);
+  if (seenContent.has(contentHash)) { stats.dup++; continue; }
+  if ((rl.content[contentHash] || []).filter((t) => now - t < DAY).length >= R.perContentPerDay) { stats.dup++; continue; }
+
+  /* 拆元数据信封 */
+  let meta = null;
+  if (dek && privateJwk && raw.env) {
+    try {
+      const m = await openFromSite(privateJwk, raw.env);
       meta = {
-        id: v.id, ts: v.ts,
+        id, ts,
         tz: norm(m.tz, 48), lg: norm(m.lg, 16), ua: norm(m.ua, 64),
         vp: norm(m.vp, 16), ref: norm(m.ref, 80), dv: norm(m.dv, 24),
         n: Number(m.n) > 0 && Number(m.n) < 1e6 ? Math.floor(Number(m.n)) : 1,
         src: norm(m.src, 24)
       };
-    } catch { stats.meta_lost = (stats.meta_lost || 0) + 1; envelopeBroken = true; }
+    } catch { stats.meta_lost++; }
   }
-  /* 信封坏了说明有人在改包；没有信封的走一个更紧的匿名桶，防止绕过设备限流 */
-  if (envelopeBroken) v.quarantine = v.quarantine || '元数据信封损坏';
 
-  /* 每设备限流：按拆封后拿到的稳定设备号（信封里的临时公钥每条都不同，不能用） */
+  /* 限流：设备号是客户端自报的，可以伪造 —— 所以还有一道全站配额兜底 */
   const hasDevice = !!(meta && meta.dv);
   const deviceKey = hasDevice ? dh(meta.dv) : 'anon';
   const cap = hasDevice ? R.perDevicePerHour : R.anonymousPerHour;
   const dTimes = (rl.devices[deviceKey] || []).filter((t) => now - t < HOUR);
   if (dTimes.length >= cap) {
-    v.quarantine = v.quarantine || (hasDevice
-      ? ('同一设备一小时内已提交 ' + dTimes.length + ' 条')
-      : ('匿名提交过多（一小时内 ' + dTimes.length + ' 条）'));
+    why = why || (hasDevice ? ('同一设备一小时内已提交 ' + dTimes.length + ' 条') : ('匿名提交过多（一小时内 ' + dTimes.length + ' 条）'));
   }
-  rl.devices[deviceKey] = (rl.devices[deviceKey] || []).concat([now]);
+  if (!why && rl.global.length >= R.globalPerHour) {
+    why = '全站一小时内已达 ' + rl.global.length + ' 条上限';
+  }
 
-  if (v.quarantine) {
-    quarantined.push({ id: v.id, name: v.name, wish: v.wish, mood: v.mood, ts: v.ts, reason: v.quarantine, meta: meta });
-  } else {
-    accepted.push({ id: v.id, name: v.name, wish: v.wish, mood: v.mood, ts: v.ts });
-    if (meta && !metaKnown.has(v.id)) metaOut.push(meta);
+  seenIds.add(id);
+  seenContent.add(contentHash);
+  rl.content[contentHash] = (rl.content[contentHash] || []).concat([now]);
+  rl.devices[deviceKey] = (rl.devices[deviceKey] || []).concat([now]);
+  rl.global.push(now);
+  stats.ok++;
+  if (shape.vis === 'private') stats.priv++;
+
+  const record = { id, name, wish, mood, ts, vis: shape.vis, reason: why || null, meta };
+
+  if (why) quarantined.push(record);
+  else if (shape.vis === 'private') vaultOut.push(record);
+  else {
+    accepted.push({ id, name, wish, mood, ts });
+    if (meta && !metaKnown.has(id)) metaOut.push(meta);
   }
 }
 
-/* ---------------------------------------------------------------- 归档 */
+/* ---------------------------------------------------------------- 落盘 */
 const acceptedIds = new Set(accepted.map((r) => r.id));
 const merged = accepted.concat([...byId.values()].filter((r) => !acceptedIds.has(r.id)));
 merged.sort((a, b) => (a.ts || 0) - (b.ts || 0));
 const overCap = Math.max(0, merged.length - R.archiveCap);
 const finalList = overCap ? merged.slice(overCap) : merged;
-
-const changed = accepted.length > 0 || overCap > 0;
-if (changed) {
+if (accepted.length || overCap) {
   await mkdir(dirname(archivePath), { recursive: true });
   await writeFile(archivePath, finalList.map((r) => JSON.stringify(r)).join('\n') + (finalList.length ? '\n' : ''));
 }
 
-if (key && metaOut.length) {
-  const head = (await readText(metaPath));
-  const lines = [];
-  for (const m of metaOut) lines.push(JSON.stringify({ id: m.id, e: await encryptJSON(key, m) }));
-  await writeFile(metaPath, head + lines.join('\n') + '\n');
+async function appendEncrypted(path, records, mapper) {
+  if (!dek || !records.length) return 0;
+  await mkdir(dirname(path), { recursive: true });
+  const head = await readText(path);
+  const out = [];
+  for (const rec of records) out.push(JSON.stringify(mapper(rec, await encryptJSON(dek, rec))));
+  await writeFile(path, head + out.join('\n') + '\n');
+  return out.length;
 }
 
-if (key && quarantined.length) {
-  const qPath = queuePath;
-  const head = await readText(qPath);
-  const lines = [];
-  for (const q of quarantined) lines.push(JSON.stringify({ id: q.id, e: await encryptJSON(key, q) }));
-  await writeFile(qPath, head + lines.join('\n') + '\n');
-}
+const metaSaved = await appendEncrypted(metaPath, metaOut, (m, e) => ({ id: m.id, e }));
+const vaultSaved = await appendEncrypted(vaultPath, vaultOut.filter((r) => !vaultKnown.has(r.id)), (r, e) => ({ id: r.id, e }));
+const queueSaved = await appendEncrypted(queuePath, quarantined, (r, e) => ({ id: r.id, e }));
 
-rl.total = (rl.total || 0) + accepted.length;
-const keys = Object.keys(rl.devices);
-if (keys.length > 5000) for (const k of keys.slice(0, keys.length - 5000)) delete rl.devices[k];
+rl.total = (rl.total || 0) + accepted.length + vaultOut.length;
+const dkeys = Object.keys(rl.devices);
+if (dkeys.length > 5000) for (const k of dkeys.slice(0, dkeys.length - 5000)) delete rl.devices[k];
 await writeJSON(rlPath, rl);
-
-if (accepted.length || quarantined.length) {
+if (accepted.length || quarantined.length || vaultOut.length) {
   await writeJSON(J('data/cursor.json'), { since: maxTime || Math.floor(Date.now() / 1000), updated: new Date().toISOString() });
 }
 
 console.log(JSON.stringify({
-  fetched: stats.in,
-  accepted: accepted.length,
-  quarantined: quarantined.length,
-  rejected: {
-    形状不符: stats.bad_shape, 工作量证明无效: stats.bad_pow, 疑似机器人: stats.bot,
-    重复内容: stats.dup, 重复id: stats.dup_id, 已屏蔽: stats.blocked, 洪水丢弃: stats.flood
+  拉取: stats.in,
+  公开上墙: accepted.length,
+  私密入库: vaultSaved,
+  隔离待审: queueSaved,
+  丢弃: {
+    形状不符: stats.bad_shape, 凭证无效: stats.bad_pow, 密封损坏: stats.bad_seal,
+    疑似机器人: stats.bot, 重复内容: stats.dup, 重复id: stats.dup_id,
+    已屏蔽: stats.blocked, 超量截断: stats.flood
   },
-  archive: finalList.length,
-  metaSaved: metaOut.length,
-  metaUnreadable: stats.meta_lost || 0,
-  trimmed: overCap
-}));
+  归档: finalList.length,
+  元数据: metaSaved,
+  元数据解不开: stats.meta_lost,
+  全站本小时: rl.global.length
+}, null, 0));

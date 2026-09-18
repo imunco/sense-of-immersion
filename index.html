@@ -103,7 +103,19 @@
           <label for="hp">这一栏请留空</label>
           <input id="hp" name="hp" type="text" tabindex="-1" autocomplete="off">
         </div>
-        <p class="privacy"><b>蛛网是公开的</b>：你的署名和这条愿望，所有人都能在蛛网上读到。<br>
+        <fieldset class="vis">
+          <legend class="field-label">Visibility · 这条愿望给谁看</legend>
+          <div class="vis__row" id="vis-picks">
+            <button class="vis-pick is-on" data-vis="public" type="button">
+              <b>公开</b><small>挂上蛛网，所有人都在露珠上读到它</small>
+            </button>
+            <button class="vis-pick" data-vis="private" type="button">
+              <b>仅自己可见</b><small>端到端加密，蛛网上不会出现，只有放映室能解开</small>
+            </button>
+          </div>
+        </fieldset>
+
+        <p class="privacy" id="privacy-note"><b>蛛网是公开的</b>：你的署名和这条愿望，所有人都能在蛛网上读到。<br>
           除此之外还会记录写下的时间，以及语言、时区、设备、来源这类基础信息——这些在离开你的浏览器之前就已经加密，中转站和仓库里都只有密文，只有持有后台口令的人才解得开。不收集 IP，不做定位。</p>
         <p class="wish-error" id="wish-error" role="status" aria-live="polite"></p>
         <button class="btn btn--thread" id="submit-wish" type="button" disabled>牵起这条丝</button>
@@ -135,6 +147,7 @@
       </div>
       <div class="reveal__poster" id="reveal-poster"></div>
       <div class="reveal__credits" id="reveal-credits"></div>
+      <p class="reveal__note" id="reveal-note" hidden>这条愿望<b>没有公开</b>。它被端到端加密，蛛网上不会出现，只有你和放映室能看到。</p>
       <div class="reveal__acts">
         <button class="btn btn--thread" id="copy-link" type="button">复制我的海报链接</button>
         <a class="btn btn--quiet" href="#/web">去看蛛网</a>
@@ -179,10 +192,10 @@
       <p>「一线千愿」是一座用蛛丝搭起来的许愿馆。你写下名字与愿望，它会被冲印成一张还没有拍出来的电影海报，然后挂到网上——成为蛛网上的一颗露珠。</p>
       <p>它借用了两个意象：一是「一线希望」里那根细得几乎看不见的丝；二是芥川龙之介笔下，从天上垂到地狱的那根蛛丝。愿望大多实现不了，但写下它、并且知道有人读到，这件事本身是有重量的。</p>
       <dl>
-        <dt>怎么玩</dt><dd>署名 → 许愿 → 选一种丝的颜色 → 揭幕 → 去蛛网看所有人的愿望。</dd>
-        <dt>看得见谁</dt><dd>蛛网是公开的。所有被写下的愿望都会出现在网上，按时间挂上去。</dd>
-        <dt>会记录什么</dt><dd>署名、愿望内容、时间，以及浏览器上报的语言、时区、屏幕尺寸、来源页这类基础信息。</dd>
-        <dt>后台</dt><dd>数据可以在「放映室」里按时间、关键词检索，并导出成 CSV。</dd>
+        <dt>怎么玩</dt><dd>署名 → 许愿 → 选一种丝的颜色 → 选给谁看 → 揭幕 → 去蛛网看公开的愿望。</dd>
+        <dt>给谁看</dt><dd>每条愿望提交时由你决定：<b>公开</b>（挂上蛛网，所有人读到）或 <b>仅自己可见</b>（端到端加密，蛛网上不会出现）。</dd>
+        <dt>会记录什么</dt><dd>署名、愿望内容、时间，以及语言、时区、设备、来源这类基础信息。基础信息一律加密，中转站和仓库里都只有密文。</dd>
+        <dt>后台</dt><dd>公开与「仅自己可见」的愿望都可以在「放映室」里按时间、关键词检索，并导出成 CSV。</dd>
       </dl>
       <p><a class="link-underline" href="#/cast">现在去写下你的那一句 →</a></p>
     </div>

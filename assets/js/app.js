@@ -4,7 +4,7 @@ import { THREADS, threadById } from './config.js';
 import {
   loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
   newId, remember, myWishes, isMine, queuePending, flushPending,
-  encodeShare, decodeShare, config, screenText, mineProof, sealMeta
+  encodeShare, decodeShare, config, screenText, mineProof, seal
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
 import { SilkWeb } from './web.js';
@@ -16,7 +16,7 @@ const state = {
   name: '', wish: '', mood: 'silk',
   all: [], cursor: 0, seen: new Set(), blocked: new Set(),
   last: null, filter: 'all', visit: 1, web: null, booted: false,
-  wishShownAt: 0, submitting: false
+  wishShownAt: 0, submitting: false, vis: 'public', mine: []
 };
 
 const sleep = (ms) => new Promise(function (r) { setTimeout(r, ms); });
@@ -103,10 +103,16 @@ function render() {
 
 /* ------------------------------------------------------------ 数据 */
 function filtered() {
+  if (state.filter === 'mine') {
+    /* 自己的愿望：公开的从网上取，私密的只从本机取 —— 别人永远看不到 */
+    const byId = new Map();
+    state.all.forEach(function (w) { if (isMine(w.id)) byId.set(w.id, w); });
+    myWishes().forEach(function (w) { if (!byId.has(w.id)) byId.set(w.id, Object.assign({ __private: w.vis === 'private' }, w)); });
+    return Array.from(byId.values()).sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+  }
   const list = state.all.filter(function (w) { return !state.blocked.has(w.id); });
   if (state.filter === 'tonight') return list.filter(isTonight);
   if (state.filter === 'week') return list.filter(function (w) { return (w.ts || 0) >= Date.now() - 7 * 864e5; });
-  if (state.filter === 'mine') return list.filter(function (w) { return isMine(w.id); });
   return list;
 }
 
@@ -203,7 +209,7 @@ function showTip(wish, pos) {
   body.textContent = wish.wish;
   const meta = document.createElement('p');
   meta.className = 'web-tip__meta';
-  meta.textContent = relTime(wish.ts) + ' · ' + threadById(wish.mood).name;
+  meta.textContent = relTime(wish.ts) + ' · ' + threadById(wish.mood).name + (wish.__private ? ' · 仅自己可见' : '');
   tip.appendChild(name); tip.appendChild(body); tip.appendChild(meta);
   tip.classList.add('is-on');
   const wrap = tip.parentElement.getBoundingClientRect();
@@ -258,6 +264,31 @@ function initThreads() {
   });
 }
 
+function pickVis(v) {
+  state.vis = v === 'private' ? 'private' : 'public';
+  session('vis', state.vis);
+  $$('#vis-picks .vis-pick').forEach(function (b) {
+    b.classList.toggle('is-on', b.dataset.vis === state.vis);
+  });
+  const note = $('#privacy-note');
+  if (note) {
+    note.textContent = '';
+    if (state.vis === 'private') {
+      note.appendChild(document.createTextNode('这条愿望会先用站点公钥在'));
+      const b1 = document.createElement('b'); b1.textContent = '你的浏览器里加密';
+      note.appendChild(b1);
+      note.appendChild(document.createTextNode('，中转站和仓库里都只有密文，蛛网上也不会出现。只有持有放映室口令的人能解开它。仍会记录时间与语言、时区这类基础信息，同样加密。'));
+    } else {
+      const b1 = document.createElement('b'); b1.textContent = '蛛网是公开的';
+      note.appendChild(b1);
+      note.appendChild(document.createTextNode('：你的署名和这条愿望，所有人都能在蛛网上读到。'));
+      const br = document.createElement('br'); note.appendChild(br);
+      note.appendChild(document.createTextNode('除此之外还会记录写下的时间，以及语言、时区、设备、来源这类基础信息——这些在离开你的浏览器之前就已经加密，中转站和仓库里都只有密文，只有持有后台口令的人才解得开。不收集 IP，不做定位。'));
+    }
+  }
+  if (state.last) state.last.vis = state.vis;
+}
+
 function pickThread(id) {
   state.mood = id;
   document.documentElement.dataset.thread = id;
@@ -310,14 +341,22 @@ function updateNameState() {
 /* ------------------------------------------------------------ 第三幕 */
 function renderReveal(rec) {
   mountPoster($('#reveal-poster'), rec, { variant: 'hero' });
+  const isPrivate = rec.vis === 'private';
   const credits = $('#reveal-credits');
   credits.textContent = '';
   const rows = [
     ['Cast', rec.name],
     ['Thread', threadById(rec.mood).name],
     ['Spoken At', speakingTime(rec.ts)],
-    ['Date', fullDate(rec.ts)]
+    ['Date', fullDate(rec.ts)],
+    ['Visibility', isPrivate ? '仅自己可见' : '公开']
   ];
+  const copyBtn = $('#copy-link');
+  if (copyBtn) copyBtn.hidden = isPrivate;
+  const note = $('#reveal-note');
+  if (note) note.hidden = !isPrivate;
+  const line = $('#reveal-title');
+  if (line) line.textContent = isPrivate ? '你的愿望，已经加密收好了。' : '你的愿望，已经挂上蛛丝。';
   rows.forEach(function (r) {
     const span = document.createElement('span');
     span.textContent = r[0] + ' ';
@@ -335,6 +374,7 @@ async function submit() {
   if (state.submitting) return;
   const name = state.name.trim().slice(0, 24);
   const wish = state.wish.trim().slice(0, 160);
+  const isPrivate = state.vis === 'private';
   const err = $('#wish-error');
   const btn = $('#submit-wish');
 
@@ -358,23 +398,30 @@ async function submit() {
   const label = btn.textContent;
   btn.textContent = '正在系上这条丝…';
 
-  const rec = {
-    id: newId(), name: name, wish: wish, mood: state.mood, ts: Date.now()
-  };
+  const ts = Date.now();
+  const rec = { id: newId(), name: name, wish: wish, mood: state.mood, ts: ts, vis: isPrivate ? 'private' : 'public' };
 
-  /* 基本信息在浏览器里就密封好，中转站和仓库里都只有密文 */
-  const meta = Object.assign(deviceInfo(), { src: 'web', n: state.visit });
-  const env = await sealMeta(meta);
+  /* 基础信息在离开浏览器之前就密封好，中转站上只有密文 */
+  const env = await seal(Object.assign(deviceInfo(), { src: 'web', n: state.visit }));
+
+  /* 「仅自己可见」时，正文也用同一套信封加密；中转站与仓库里都没有明文 */
+  let prv = null;
+  if (isPrivate) {
+    prv = await seal({ name: name, wish: wish, mood: state.mood, ts: ts });
+    if (!prv) {
+      err.textContent = '这条没法加密，先别提交。刷新一下页面再试。';
+      btn.textContent = label; btn.disabled = false; state.submitting = false;
+      return;
+    }
+  }
 
   const proof = await mineProof(rec.id, null, function (n) {
     btn.textContent = '正在系上这条丝… ' + Math.round(n / 1000) + 'k';
   });
 
-  const payload = {
-    id: rec.id, name: rec.name, wish: rec.wish, mood: rec.mood, ts: rec.ts,
-    pow: proof.pow, hp: '', ft: Date.now() - (state.wishShownAt || Date.now()),
-    env: env
-  };
+  const payload = isPrivate
+    ? { id: rec.id, vis: 'private', prv: prv, pow: proof.pow, hp: '', ft: Date.now() - (state.wishShownAt || Date.now()), env: env }
+    : { id: rec.id, vis: 'public', name: name, wish: wish, mood: state.mood, ts: ts, pow: proof.pow, hp: '', ft: Date.now() - (state.wishShownAt || Date.now()), env: env };
 
   btn.textContent = label;
   state.submitting = false;
@@ -382,8 +429,11 @@ async function submit() {
 
   state.last = rec;
   remember(rec);
-  state.seen.add(rec.id);
-  state.all = merge(state.all, [rec]);
+  state.mine = myWishes();
+  if (!isPrivate) {
+    state.seen.add(rec.id);
+    state.all = merge(state.all, [rec]);
+  }
   counts();
   if (state.web) state.web.markBorn(rec.id);
   syncWeb();
@@ -393,7 +443,7 @@ async function submit() {
 
   try {
     await publish(payload);
-    toast('愿望已挂上蛛丝');
+    toast(isPrivate ? '已加密收好，只有你能看到' : '愿望已挂上蛛丝');
   } catch (e) {
     queuePending(payload);
     toast('网络不太稳，先替你存在本机，稍后自动补发');
@@ -404,6 +454,7 @@ async function submit() {
 async function copyLink() {
   const rec = state.last;
   if (!rec) return;
+  if (rec.vis === 'private') { toast('这条愿望没有公开，也就没有可分享的链接'); return; }
   const url = location.origin + location.pathname + '#/w/' + encodeShare(rec);
   try {
     await navigator.clipboard.writeText(url);
@@ -440,6 +491,10 @@ function bind() {
   });
   $('#submit-wish').addEventListener('click', submit);
   $('#copy-link').addEventListener('click', copyLink);
+  $('#vis-picks').addEventListener('click', function (e) {
+    const btn = e.target.closest('.vis-pick');
+    if (btn) pickVis(btn.dataset.vis);
+  });
 
   $('#web-filters').addEventListener('click', function (e) {
     const btn = e.target.closest('.chip');
@@ -475,6 +530,8 @@ async function boot() {
 
   initThreads();
   pickThread(state.mood);
+  pickVis(session('vis') || 'public');
+  state.mine = myWishes();
   updateNameState();
   updateWishState();
   paintPoster();
