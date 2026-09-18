@@ -5,13 +5,16 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
   push:
-    paths: ['scripts/collect.mjs', 'data/config.json', '.github/workflows/collect.yml']
+    paths:
+      - 'scripts/collect.mjs'
+      - 'data/config.json'
+      - '.github/workflows/collect.yml'
 
 permissions:
   contents: write
 
 concurrency:
-  group: collect
+  group: collect-wishes
   cancel-in-progress: false
 
 jobs:
@@ -22,16 +25,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Pull wishes from the relay
+
+      - name: 从中转站拉取新的愿望
         run: node scripts/collect.mjs
-      - name: Archive
+
+      - name: 归档并提交
         run: |
           git config user.name "wish-collector"
           git config user.email "wish-collector@users.noreply.github.com"
-          git add data/
-          if git diff --quiet --cached; then
-            echo "no new wishes"
-          else
-            git commit -m "collect: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git push
-          fi
+          git fetch origin main --quiet
+          for attempt in 1 2 3 4 5; do
+            git add data/
+            if git diff --quiet --cached; then
+              echo "没有新愿望"
+              exit 0
+            fi
+            git commit -q -m "collect: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if git push --quiet 2>/dev/null; then
+              echo "已推送"
+              exit 0
+            fi
+            echo "推送被拒（并发），第 $attempt 次重试"
+            git fetch origin main --quiet
+            git reset --hard FETCH_HEAD
+            node scripts/collect.mjs
+          done
+          echo "重试 5 次仍失败"; exit 1
