@@ -55,9 +55,50 @@ export function remember(rec) {
 }
 export function forget(id) { write(K.mine, myWishes().filter(function (w) { return w.id !== id; })); }
 
-export function queuePending(rec) { write(K.pending, read(K.pending, []).concat([rec]).slice(-40)); }
+/* ---------------------------------------------------------- 可靠投递
+   中转站只保留 12 小时，而 GitHub 的定时任务只是"尽力而为"（可能延迟甚至不跑）。
+   所以每条愿望在本机留一份：下次打开页面时，如果它还没出现在归档里，就再投一次。
+   采集器按 id 去重，重复投递不会产生重复愿望。 */
+function putPending(item) {
+  const list = read(K.pending, []).filter(function (x) { return x.id !== item.id; });
+  list.push(item);
+  write(K.pending, list.slice(-60));
+}
+
+export function queuePending(payload) {
+  putPending({ id: payload.id, payload: payload, at: Date.now(), tries: 0, delivered: false });
+}
+
+export function trackDelivered(payload) {
+  putPending({ id: payload.id, payload: payload, at: Date.now(), tries: 0, delivered: true });
+}
+
 export function pending() { return read(K.pending, []); }
-export function clearPending() { write(K.pending, []); }
+
+const RESEND_AFTER = 15 * 60 * 1000;
+
+export async function flushPending(knownIds) {
+  const list = read(K.pending, []);
+  const keep = [];
+  let sent = 0;
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    if (knownIds && knownIds.has(item.id)) continue;          /* 已确认落进归档 */
+    const isPrivate = item.payload && item.payload.vis === 'private';
+    const maxTries = item.delivered ? (isPrivate ? 1 : 3) : 6;
+    if (item.tries >= maxTries) continue;
+    if (item.delivered && Date.now() - item.at < RESEND_AFTER) { keep.push(item); continue; }
+    try {
+      await publish(item.payload);
+      sent++;
+      keep.push({ id: item.id, payload: item.payload, at: Date.now(), tries: item.tries + 1, delivered: true });
+    } catch (e) {
+      keep.push(item);           /* 网络不通就留着，下次再说 */
+    }
+  }
+  write(K.pending, keep);
+  return sent;
+}
 
 /* ---------------------------------------------------------- 基础信息 */
 function parseUA(ua) {
@@ -213,17 +254,6 @@ export async function publish(payload) {
   });
   if (!r.ok) throw new Error('relay ' + r.status);
   return r.json();
-}
-
-export async function flushPending() {
-  const list = pending();
-  if (!list.length) return 0;
-  const kept = [];
-  for (let i = 0; i < list.length; i++) {
-    try { await publish(list[i]); } catch (e) { kept.push(list[i]); }
-  }
-  write(K.pending, kept);
-  return list.length - kept.length;
 }
 
 /* 拉取中转站上最近的愿望。since 为 unix 秒，'all' 表示缓存内的全部。 */

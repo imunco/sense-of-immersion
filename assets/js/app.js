@@ -3,7 +3,7 @@ import { loadFonts } from './fonts.js';
 import { THREADS, threadById } from './config.js';
 import {
   loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
-  newId, remember, myWishes, isMine, queuePending, flushPending,
+  newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered,
   encodeShare, decodeShare, config, screenText, mineProof, seal
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
@@ -443,6 +443,7 @@ async function submit() {
 
   try {
     await publish(payload);
+    trackDelivered(payload);
     toast(isPrivate ? '已加密收好，只有你能看到' : '愿望已挂上蛛丝');
   } catch (e) {
     queuePending(payload);
@@ -544,7 +545,9 @@ async function boot() {
   } catch (e) {
     counts(); /* 数据层出问题也不能让页面停在半路 */
   }
-  flushPending().then(function (n) { if (n) toast('补发了 ' + n + ' 条愿望'); }).catch(function () {});
+  /* 归档确认：定时任务可能延迟甚至没跑，本机替它兜一层 */
+  const known = new Set(state.all.map(function (w) { return w.id; }));
+  flushPending(known).then(function (n) { if (n) toast('补发了 ' + n + ' 条愿望'); }).catch(function () {});
   state.booted = true;
 
   setInterval(tick, 15000);
