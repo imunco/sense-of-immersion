@@ -1,5 +1,8 @@
 name: collect-wishes
 
+# 定时归档。注意：GitHub 的 schedule 只是"尽力而为"，可能延迟或在高峰期被丢弃。
+# 因此前台与后台都会直接读中转站的实时缓存，归档只负责长期保存。
+# 需要立刻归档时可以手动触发：gh workflow run collect-wishes
 on:
   schedule:
     - cron: '*/5 * * * *'
