@@ -7,11 +7,8 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+  # 任何推送都顺便归档一次 —— GitHub 的 schedule 不可靠，这是最实在的兜底
   push:
-    paths:
-      - 'scripts/collect.mjs'
-      - 'data/config.json'
-      - '.github/workflows/collect.yml'
 
 permissions:
   contents: write

@@ -3,6 +3,10 @@
 *.passphrase
 .env
 
+# 离线备份里有明文，绝不提交
+backups/
+.dsh-watchdog.log
+
 node_modules/
 tests/shots/
 package-lock.json

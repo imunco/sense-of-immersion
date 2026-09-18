@@ -3,7 +3,7 @@ import { loadFonts } from './fonts.js';
 import { THREADS, threadById } from './config.js';
 import {
   loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
-  newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered,
+  newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered, loadVaultIds,
   encodeShare, decodeShare, config, screenText, mineProof, seal
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
@@ -545,9 +545,15 @@ async function boot() {
   } catch (e) {
     counts(); /* 数据层出问题也不能让页面停在半路 */
   }
-  /* 归档确认：定时任务可能延迟甚至没跑，本机替它兜一层 */
+  /* 归档确认：GitHub 的定时任务可能延迟甚至根本不跑，本机替它兜一层。
+     公开愿望看 wishes.jsonl，私密愿望看 vault.jsonl（只暴露 id）。 */
   const known = new Set(state.all.map(function (w) { return w.id; }));
-  flushPending(known).then(function (n) { if (n) toast('补发了 ' + n + ' 条愿望'); }).catch(function () {});
+  loadVaultIds().then(function (ids) {
+    ids.forEach(function (id) { known.add(id); });
+    return flushPending(known);
+  }).then(function (n) {
+    if (n) toast('补发了 ' + n + ' 条还没归档的愿望');
+  }).catch(function () {});
   state.booted = true;
 
   setInterval(tick, 15000);

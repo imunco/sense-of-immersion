@@ -75,7 +75,23 @@ export function trackDelivered(payload) {
 
 export function pending() { return read(K.pending, []); }
 
-const RESEND_AFTER = 15 * 60 * 1000;
+/* 私密愿望在 vault.jsonl 里只暴露 id，客户端可以借此确认它到底归档了没有 */
+export async function loadVaultIds() {
+  try {
+    const r = await fetch('data/private/vault.jsonl', { cache: 'no-cache' });
+    if (!r.ok) return [];
+    const text = await r.text();
+    const out = [];
+    text.split('\n').forEach(function (line) {
+      if (!line.trim()) return;
+      try { out.push(JSON.parse(line).id); } catch (e) {}
+    });
+    return out;
+  } catch (e) { return []; }
+}
+
+const RESEND_AFTER = 20 * 60 * 1000;   /* 未确认归档就每 20 分钟再投一次，永不放弃 */
+const MAX_PER_VISIT = 5;               /* 一次访问最多补投 5 条，别把访客的网刷爆 */
 
 export async function flushPending(knownIds) {
   const list = read(K.pending, []);
@@ -83,15 +99,13 @@ export async function flushPending(knownIds) {
   let sent = 0;
   for (let i = 0; i < list.length; i++) {
     const item = list[i];
-    if (knownIds && knownIds.has(item.id)) continue;          /* 已确认落进归档 */
-    const isPrivate = item.payload && item.payload.vis === 'private';
-    const maxTries = item.delivered ? (isPrivate ? 1 : 3) : 6;
-    if (item.tries >= maxTries) continue;
+    if (knownIds && knownIds.has(item.id)) continue;   /* 已确认落进归档，不用再管 */
     if (item.delivered && Date.now() - item.at < RESEND_AFTER) { keep.push(item); continue; }
+    if (sent >= MAX_PER_VISIT) { keep.push(item); continue; }
     try {
       await publish(item.payload);
       sent++;
-      keep.push({ id: item.id, payload: item.payload, at: Date.now(), tries: item.tries + 1, delivered: true });
+      keep.push({ id: item.id, payload: item.payload, at: Date.now(), tries: (item.tries || 0) + 1, delivered: true });
     } catch (e) {
       keep.push(item);           /* 网络不通就留着，下次再说 */
     }
