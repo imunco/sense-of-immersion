@@ -94,17 +94,20 @@ export async function loadVaultIds() {
    由它带着令牌去 dispatch GitHub Actions。没有配置 pokeUrl 就静默跳过。 */
 const POKE_KEY = 'yixian.poked.v1';
 const POKE_COUNT = 'yixian.pokecount.v1';
-const POKE_MIN_GAP = 20 * 1000;   /* 服务端还有 45 秒限流，这里不用卡太久 */
-const POKE_MAX_PER_SESSION = 40;  /* 防呆上限，正常用不到 */
+const POKE_MIN_GAP = 20 * 1000;   /* 轮询重试的最小间隔 */
+const POKE_MAX_PER_SESSION = 40;  /* 轮询重试的防呆上限 */
 
-export async function pokeArchive() {
+/* force=true 用于「用户刚亲手提交了一条愿望」—— 这一次永远不能被前端省掉，
+   否则浏览器一关，重试循环就没了，那条愿望要等下一次别的触发。
+   force=false 用于后台轮询重试，受最小间隔约束。 */
+export async function pokeArchive(force) {
   const url = cfg.pokeUrl || FALLBACK.pokeUrl;
   if (!url) return false;
   try {
     const last = Number(sessionStorage.getItem(POKE_KEY) || 0);
-    if (Date.now() - last < POKE_MIN_GAP) return false;
+    if (!force && Date.now() - last < POKE_MIN_GAP) return false;
     const n = Number(sessionStorage.getItem(POKE_COUNT) || 0);
-    if (n >= POKE_MAX_PER_SESSION) return false;
+    if (!force && n >= POKE_MAX_PER_SESSION) return false;
     sessionStorage.setItem(POKE_KEY, String(Date.now()));
     sessionStorage.setItem(POKE_COUNT, String(n + 1));
   } catch (e) {}
@@ -130,7 +133,7 @@ export async function loadQueueIds() {
   } catch (e) { return []; }
 }
 
-const RESEND_AFTER = 20 * 60 * 1000;   /* 未确认归档就每 20 分钟再投一次，永不放弃 */
+const RESEND_AFTER = 3 * 60 * 1000;   /* 未确认归档就每 3 分钟再投一次，永不放弃 */
 const MAX_PER_VISIT = 5;               /* 一次访问最多补投 5 条，别把访客的网刷爆 */
 
 export async function flushPending(knownIds) {

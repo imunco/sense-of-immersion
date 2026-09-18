@@ -451,7 +451,7 @@ async function submit() {
   try {
     await publish(payload);
     trackDelivered(payload);
-    pokeArchive();   /* 立刻叫醒归档，不用等下一条定时任务 */
+    pokeArchive(true);   /* 用户亲手提交的这一次，永远要叫 */
     toast(isPrivate ? '已加密收好，只有你能看到' : '愿望已挂上蛛丝');
   } catch (e) {
     queuePending(payload);
