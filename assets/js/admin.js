@@ -526,19 +526,42 @@ function exportJson() {
 /* ---------------------------------------------------------- 启动 */
 function renderAll() { renderLedger(); renderTimeline(); renderTable(); renderQueue(); }
 
+/* 顶栏状态栏每秒重绘，时间一直在走 */
+const statusInfo = { phase: '正在解密元数据…', ok: false, meta: 0, fail: 0, queue: 0, live: 0 };
+
+function renderStatus() {
+  const el = $('#proj-status');
+  if (!el) return;
+  if (!statusInfo.ok) { el.textContent = statusInfo.phase; return; }
+  const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  el.textContent = now +
+    ' · 元数据 ' + statusInfo.meta + ' 条' +
+    (statusInfo.fail ? '（' + statusInfo.fail + ' 条解不开）' : '') +
+    ' · 待审 ' + statusInfo.queue + ' 条' +
+    ' · 未归档 ' + statusInfo.live + ' 条';
+}
+
+let statusTimer = 0;
+function startStatusClock() { if (!statusTimer) statusTimer = setInterval(renderStatus, 1000); }
+
 async function enter() {
   $('#gate').hidden = true;
   $('#room').hidden = false;
-  $('#proj-status').textContent = '正在解密元数据…';
+  statusInfo.phase = '正在解密元数据…';
+  renderStatus();
+  startStatusClock();
   try {
     await load();
+    statusInfo.ok = true;
   } catch (e) {
-    $('#proj-status').textContent = '读取失败：' + e.message;
+    statusInfo.phase = '读取失败：' + e.message;
   }
   renderAll();
-  $('#proj-status').textContent = '已连上蛛丝 · ' + new Date().toLocaleTimeString('zh-CN') +
-    ' · 元数据 ' + state.metaOk + ' 条' + (state.metaFail ? '（' + state.metaFail + ' 条解不开）' : '') +
-    ' · 待审 ' + state.queue.length + ' 条';
+  statusInfo.meta = state.metaOk;
+  statusInfo.fail = state.metaFail;
+  statusInfo.queue = state.queue.length;
+  statusInfo.live = state.liveIds.size;
+  renderStatus();
 
   setInterval(async () => {
     if (!KEY) return;

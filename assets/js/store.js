@@ -93,7 +93,9 @@ export async function loadVaultIds() {
 /* 叫醒归档：浏览器里不能放 GitHub 令牌，所以只打我们自己的 Vercel 函数，
    由它带着令牌去 dispatch GitHub Actions。没有配置 pokeUrl 就静默跳过。 */
 const POKE_KEY = 'yixian.poked.v1';
-const POKE_MIN_GAP = 2 * 60 * 1000;
+const POKE_COUNT = 'yixian.pokecount.v1';
+const POKE_MIN_GAP = 20 * 1000;   /* 服务端还有 45 秒限流，这里不用卡太久 */
+const POKE_MAX_PER_SESSION = 40;  /* 防呆上限，正常用不到 */
 
 export async function pokeArchive() {
   const url = cfg.pokeUrl || FALLBACK.pokeUrl;
@@ -101,12 +103,31 @@ export async function pokeArchive() {
   try {
     const last = Number(sessionStorage.getItem(POKE_KEY) || 0);
     if (Date.now() - last < POKE_MIN_GAP) return false;
+    const n = Number(sessionStorage.getItem(POKE_COUNT) || 0);
+    if (n >= POKE_MAX_PER_SESSION) return false;
     sessionStorage.setItem(POKE_KEY, String(Date.now()));
+    sessionStorage.setItem(POKE_COUNT, String(n + 1));
   } catch (e) {}
   try {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     return r.ok;
   } catch (e) { return false; }
+}
+
+/* 被隔离待审的愿望也会出现在 queue.jsonl 里（只暴露 id），
+   客户端认出它们之后就不会再无休止地重投。 */
+export async function loadQueueIds() {
+  try {
+    const r = await fetch('data/queue.jsonl', { cache: 'no-cache' });
+    if (!r.ok) return [];
+    const text = await r.text();
+    const out = [];
+    text.split('\n').forEach(function (line) {
+      if (!line.trim()) return;
+      try { out.push(JSON.parse(line).id); } catch (e) {}
+    });
+    return out;
+  } catch (e) { return []; }
 }
 
 const RESEND_AFTER = 20 * 60 * 1000;   /* 未确认归档就每 20 分钟再投一次，永不放弃 */

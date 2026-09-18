@@ -3,7 +3,7 @@ import { loadFonts } from './fonts.js';
 import { THREADS, threadById } from './config.js';
 import {
   loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
-  newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered, loadVaultIds,
+  newId, remember, myWishes, isMine, queuePending, flushPending, trackDelivered, loadVaultIds, loadQueueIds,
   encodeShare, decodeShare, config, screenText, mineProof, seal, pokeArchive, pending
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
@@ -153,8 +153,15 @@ async function loadAll() {
   counts();
 }
 
+/* 只要还有没落库的愿望，就持续叫醒归档 —— 一次触发被限流丢掉也不会卡住 */
+function pokeIfPending() {
+  if (!pending().length) return;
+  pokeArchive();
+}
+
 async function tick() {
   if (document.hidden) return;
+  pokeIfPending();
   try {
     const list = await poll(state.cursor || 'all');
     if (!list.length) return;
@@ -515,7 +522,7 @@ function bind() {
   window.addEventListener('resize', function () {
     if (currentView === 'wish') { fitPoster($('#poster-preview')); }
   });
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { pokeIfPending(); tick(); } });
 }
 
 async function boot() {
@@ -549,12 +556,13 @@ async function boot() {
   /* 归档确认：GitHub 的定时任务可能延迟甚至根本不跑，本机替它兜一层。
      公开愿望看 wishes.jsonl，私密愿望看 vault.jsonl（只暴露 id）。 */
   const known = new Set(state.all.map(function (w) { return w.id; }));
-  loadVaultIds().then(function (ids) {
-    ids.forEach(function (id) { known.add(id); });
+  Promise.all([loadVaultIds(), loadQueueIds()]).then(function (lists) {
+    lists.forEach(function (ids) { ids.forEach(function (id) { known.add(id); }); });
+    state.known = known;
     return flushPending(known);
   }).then(function (n) {
     if (n) toast('补发了 ' + n + ' 条还没归档的愿望');
-    if (pending().length) pokeArchive();   /* 还有没落库的，顺手叫一次归档 */
+    pokeIfPending();
   }).catch(function () {});
   state.booted = true;
 
