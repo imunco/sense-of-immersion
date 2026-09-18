@@ -1,5 +1,5 @@
 /* 放映室 —— 后台 */
-import { loadConfig, loadArchive, poll, merge, config } from './store.js';
+import { loadConfig, loadArchive, loadBlocked, poll, merge, config } from './store.js';
 import { THREADS, threadById } from './config.js';
 import { mountPoster, fullDate, speakingTime, relTime } from './poster.js';
 import { loadFonts } from './fonts.js';
@@ -10,7 +10,7 @@ const HK = 'yixian.hidden.v1';
 const AK = 'yixian.room.v1';
 
 const state = {
-  rows: [], filter: 'all', q: '', sort: 'desc', showHidden: false, limit: 300, cursor: 0, liveIds: new Set()
+  rows: [], filter: 'all', q: '', sort: 'desc', showHidden: false, limit: 300, cursor: 0, liveIds: new Set(), blocked: new Set()
 };
 
 /* ---------------------------------------------------------- 口令 */
@@ -33,6 +33,8 @@ async function unlock(pass) {
 
 /* ---------------------------------------------------------- 读取 */
 async function load() {
+  const blocked = await loadBlocked();
+  blocked.forEach((id) => state.blocked.add(id));
   const archive = await loadArchive(true);
   state.rows = archive.slice();
   try {
@@ -61,7 +63,7 @@ function visible() {
   }
   if (!state.showHidden) {
     const hid = hiddenIds();
-    rows = rows.filter((r) => hid.indexOf(r.id) < 0);
+    rows = rows.filter((r) => hid.indexOf(r.id) < 0 && !state.blocked.has(r.id));
   }
   rows.sort((a, b) => state.sort === 'desc' ? (b.ts || 0) - (a.ts || 0) : (a.ts || 0) - (b.ts || 0));
   return rows;
@@ -182,7 +184,12 @@ function renderTable() {
     const tdWish = document.createElement('td');
     tdWish.className = 'cell-wish';
     tdWish.textContent = r.wish;
-    if (state.liveIds.has(r.id)) {
+    if (state.blocked.has(r.id)) {
+      const tag = document.createElement('span');
+      tag.className = 'tag-live';
+      tag.textContent = '已屏蔽';
+      tdWish.appendChild(tag);
+    } else if (state.liveIds.has(r.id)) {
       const tag = document.createElement('span');
       tag.className = 'tag-live';
       tag.textContent = '未归档';
@@ -269,7 +276,7 @@ function openDrawer(r) {
     ['来访次数', r.n ? '第 ' + r.n + ' 次' : '—'],
     ['设备标识', r.dv || '—'],
     ['入口', r.src || 'web'],
-    ['归档', state.liveIds.has(r.id) ? '尚未归档（等采集器写入）' : '已归档']
+    ['归档', state.blocked.has(r.id) ? '已屏蔽（不进蛛网）' : (state.liveIds.has(r.id) ? '尚未归档（等采集器写入）' : '已归档')]
   ];
   rows.forEach((pair) => {
     const dt = document.createElement('dt');

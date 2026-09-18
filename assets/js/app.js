@@ -2,7 +2,7 @@
 import { loadFonts } from './fonts.js';
 import { THREADS, threadById } from './config.js';
 import {
-  loadConfig, loadArchive, poll, publish, merge, deviceInfo, visitCount,
+  loadConfig, loadArchive, loadBlocked, poll, publish, merge, deviceInfo, visitCount,
   newId, remember, myWishes, isMine, queuePending, flushPending,
   encodeShare, decodeShare, config
 } from './store.js';
@@ -14,7 +14,7 @@ const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
 
 const state = {
   name: '', wish: '', mood: 'silk',
-  all: [], cursor: 0, seen: new Set(),
+  all: [], cursor: 0, seen: new Set(), blocked: new Set(),
   last: null, filter: 'all', visit: 1, web: null, booted: false
 };
 
@@ -99,7 +99,7 @@ function render() {
 
 /* ------------------------------------------------------------ 数据 */
 function filtered() {
-  const list = state.all;
+  const list = state.all.filter(function (w) { return !state.blocked.has(w.id); });
   if (state.filter === 'tonight') return list.filter(isTonight);
   if (state.filter === 'week') return list.filter(function (w) { return (w.ts || 0) >= Date.now() - 7 * 864e5; });
   if (state.filter === 'mine') return list.filter(function (w) { return isMine(w.id); });
@@ -117,6 +117,7 @@ function absorb(list, animate) {
   const fresh = [];
   list.forEach(function (w) {
     const key = w.id || (w.name + '|' + w.wish + '|' + w.ts);
+    if (state.blocked.has(key)) return; /* 被屏蔽的愿望不进网 */
     if (state.seen.has(key)) return;
     state.seen.add(key);
     fresh.push(w);
@@ -130,6 +131,8 @@ function absorb(list, animate) {
 }
 
 async function loadAll() {
+  const blocked = await loadBlocked();
+  blocked.forEach(function (id) { state.blocked.add(id); });
   const archive = await loadArchive();
   absorb(archive, false);
   try {

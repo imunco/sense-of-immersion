@@ -125,6 +125,19 @@ export async function loadArchive(force) {
   }
 }
 
+/* ---------------------------------------------------------- 屏蔽名单 */
+let blockedCache = null;
+
+export async function loadBlocked() {
+  if (blockedCache) return blockedCache;
+  try {
+    const r = await fetch('data/blocked.json', { cache: 'no-cache' });
+    blockedCache = r.ok ? await r.json() : [];
+    if (!Array.isArray(blockedCache)) blockedCache = [];
+  } catch (e) { blockedCache = blockedCache || []; }
+  return blockedCache;
+}
+
 /* ---------------------------------------------------------- 中转站 */
 export async function publish(rec) {
   const r = await fetch(endpoint() + '/' + encodeURIComponent(cfg.topic), {
