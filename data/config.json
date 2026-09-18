@@ -3,5 +3,15 @@
   "endpoint": "https://ntfy.sh",
   "title": "一线千愿",
   "subtitle": "ONE THREAD, A THOUSAND WISHES",
-  "adminHash": "3f48cf10a793ba608f0ec0c77fc3604a22ae34befd56b144fbe8eba59af511ca"
+  "crypto": {
+    "alg": "PBKDF2-SHA256 / AES-256-GCM",
+    "salt": "RSWWC3K3Y/2qCSXCNrb+cA==",
+    "iterations": 250000
+  },
+  "siteKey": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "84zqpZW40I7kRX8aWZbwlKQKkISjwAcR2kOvYemaAcQ",
+    "y": "DIvQxdJ26rRBzUVR9f0CahKk8WyW7fu2ooN55Eg1Kqk"
+  }
 }

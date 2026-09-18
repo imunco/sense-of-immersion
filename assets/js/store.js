@@ -1,5 +1,7 @@
 /* 数据层 —— 中转站写入、归档读取、本机兜底 */
 import { FALLBACK } from './config.js';
+import { sha256Hex } from '../../shared/sha256.js';
+import { sealForSite } from '../../shared/envelope.js';
 
 const K = {
   mine:   'yixian.mine.v1',
@@ -138,11 +140,72 @@ export async function loadBlocked() {
   return blockedCache;
 }
 
+/* ---------------------------------------------------------- 审查规则 */
+let moderationCache = null;
+
+export async function loadModeration() {
+  if (moderationCache) return moderationCache;
+  moderationCache = { limits: { nameMax: 24, wishMax: 160, wishMin: 2, maxLinks: 0, maxRepeatRun: 8 }, bannedWords: [] };
+  try {
+    const r = await fetch('data/moderation.json', { cache: 'no-cache' });
+    if (r.ok) {
+      const m = await r.json();
+      moderationCache = Object.assign(moderationCache, m);
+      moderationCache.limits = Object.assign({ nameMax: 24, wishMax: 160, wishMin: 2, maxLinks: 0, maxRepeatRun: 8 }, m.limits || {});
+      moderationCache.bannedWords = (m.bannedWords || []).map(function (w) { return String(w); });
+    }
+  } catch (e) {}
+  return moderationCache;
+}
+
+export function moderation() { return moderationCache || { limits: { maxLinks: 0, maxRepeatRun: 8 }, bannedWords: [] }; }
+
+/* 和采集器同样的规则，先在本地拦一道，省得用户白等 */
+export function screenText(name, wish) {
+  const mod = moderation();
+  const L = mod.limits;
+  const text = (name + ' ' + wish).trim();
+  const lower = text.toLowerCase();
+  const hits = mod.bannedWords.filter(function (b) { return lower.indexOf(String(b).toLowerCase()) >= 0; });
+  if (hits.length) return '这句话里有像推广或违规的词（' + hits.slice(0, 2).join('、') + '），换一种说法吧。';
+  const links = (text.match(/(?:https?:\/\/|www\.|t\.me\/|\b\d{1,3}(?:\.\d{1,3}){3}\b)/gi) || []).length;
+  if (links > (L.maxLinks || 0)) return '愿望里不要放链接。';
+  let run = 1, best = 1;
+  for (let i = 1; i < text.length; i++) { run = text[i] === text[i - 1] ? run + 1 : 1; if (run > best) best = run; }
+  if (best > (L.maxRepeatRun || 8)) return '重复的字太多了，写点真心话吧。';
+  if (!/[\p{L}\p{N}]/u.test(wish)) return '愿望里得有文字才行。';
+  return null;
+}
+
+/* ---------------------------------------------------------- 工作量证明 */
+/* 提交前先挖一个 nonce，让脚本批量灌的成本变高。采集器会验这个证明。 */
+export async function mineProof(id, difficulty, onProgress) {
+  const bits = difficulty || (cfg.proofOfWork && cfg.proofOfWork.difficulty) || 4;
+  const prefix = new Array(bits + 1).join('0');
+  let n = 0;
+  for (;;) {
+    const pow = n.toString(36);
+    if (sha256Hex(id + '|' + pow).slice(0, bits) === prefix) return { pow: pow, hashes: n + 1 };
+    n++;
+    if ((n & 8191) === 0) {
+      if (onProgress) onProgress(n);
+      await new Promise(function (r) { setTimeout(r, 0); });
+    }
+  }
+}
+
+/* ---------------------------------------------------------- 密封元数据 */
+export async function sealMeta(meta) {
+  const pub = cfg.siteKey || FALLBACK.siteKey;
+  if (!pub) return null;
+  try { return await sealForSite(pub, meta); } catch (e) { return null; }
+}
+
 /* ---------------------------------------------------------- 中转站 */
-export async function publish(rec) {
+export async function publish(payload) {
   const r = await fetch(endpoint() + '/' + encodeURIComponent(cfg.topic), {
     method: 'POST',
-    body: JSON.stringify(rec),
+    body: JSON.stringify(payload),
     headers: { 'content-type': 'text/plain;charset=utf-8' }
   });
   if (!r.ok) throw new Error('relay ' + r.status);

@@ -39,14 +39,18 @@
 **改口令。** 口令不是明文存的，存的是 SHA-256（默认值和设置方式见交付说明）：
 
 ```bash
-node -e "console.log(require('crypto').createHash('sha256').update('你的新口令').digest('hex'))"
+```bash
+node scripts/set-passphrase.mjs "我的新口令"
+gh secret set WISH_ADMIN_PASSPHRASE --body "我的新口令"
 ```
 
-把输出的 hash 填进 `data/config.json` 的 `adminHash`，提交即可。
+第一条会生成新的盐与站点密钥对、写回校验块；第二条让采集器也能用新口令加密。
+（想保留历史密文就带上旧口令：`node scripts/set-passphrase.mjs "新" "旧"`。）
 
-> ⚠️ 说实话：`data/wishes.jsonl` 在公开仓库里，**任何拿到地址的人都能直接读**。
-> 口令只是一道门帘，不是保险柜。这是「愿望本就公开」这个设定的自然结果；
-> 真要私密，就得换成带服务端的托管（见文末）。
+> 注意：`data/wishes.jsonl` 里是公开的署名与愿望——**这不需要口令，也确实谁都能读**。
+> 口令管的是另一件事：`data/private/meta.jsonl` 和 `data/queue.jsonl` 里那些
+> 「语言 / 时区 / 设备 / 来源」之类的信息，没有口令就是一堆密文。
+> 详见 [SECURITY.md](SECURITY.md)。
 
 **删一条愿望：**
 
@@ -86,6 +90,36 @@ ntfy 是公开的、匿名的、带 CORS 的中转站；GitHub 仓库本身就�
 | `data/wishes.jsonl` | 归档，一行一条愿望 |
 | `data/cursor.json` | 采集游标（上次读到哪一秒） |
 | `data/blocked.json` | 屏蔽名单 |
+
+---
+
+## 安全与内容审查
+
+完整说明见 **[SECURITY.md](SECURITY.md)**。要点：
+
+- **公开的**：署名、愿望正文、时间、丝线颜色 —— 这是产品设定（蛛网就是给人看的）。
+- **加密的**：语言 / 时区 / 设备 / 视口 / 来源页 / 设备标识。
+  在浏览器里用 ECIES（临时 ECDH + HKDF + AES-GCM）密封 → 中转站只见密文 →
+  采集器拆开后再用口令派生的 AES-256-GCM 密钥加密落盘 → 后台用口令在本地解开。
+  口令不落盘、不上传，只存在内存里；刷新失效，闲置 30 分钟自动锁定；连错 5 次锁 60 秒。
+- **写入侧**：形状校验 + 工作量证明（每条要挖 4 位十六进制零）+ 蜜罐 + 填写时长 +
+  违禁词/链接/重复字符审查（**隔离待审，不删除**）+ 每设备 6 条/小时 + 匿名桶 20 条/小时 +
+  内容去重 + 单次 120 条上限 + 归档 2 万条上限。
+- **导出**：CSV 单元格做了公式注入防护。
+
+审核被隔离的内容：
+
+```bash
+WISH_ADMIN_PASSPHRASE=<口令> node scripts/moderate.mjs list
+WISH_ADMIN_PASSPHRASE=<口令> node scripts/moderate.mjs approve <id>   # 放上蛛网
+node scripts/moderate.mjs reject <id>                                # 永久屏蔽
+```
+
+规则都在 `data/moderation.json`，改完提交即生效，不用重新部署。
+
+> 需要先设置一次 GitHub Secret，采集器才能加密元数据：
+> `gh secret set WISH_ADMIN_PASSPHRASE --body "<你的口令>"`
+> 没有这个 Secret，采集器仍然工作，但只会归档公开部分，不保存基础信息。
 
 ---
 

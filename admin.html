@@ -21,7 +21,8 @@
 <section class="gate" id="gate">
   <p class="eyebrow">Projection Room</p>
   <h1>放映室</h1>
-  <p>这里存放着蛛丝上所有的愿望、署名与写下的时刻。请先对暗号。</p>
+  <p>这里存放着蛛丝上所有的愿望、署名与写下的时刻。<br>
+    口令会用 PBKDF2 派生密钥，在本机解开被加密的基础信息——口令不会离开这个浏览器。</p>
   <form id="gate-form" autocomplete="off">
     <label class="sr" for="gate-pass">口令</label>
     <input id="gate-pass" type="password" placeholder="口令" autocomplete="current-password">
@@ -76,11 +77,23 @@
       </div>
     </section>
 
+    <section class="queue" id="queue-panel" hidden aria-label="待审内容">
+      <div class="queue__head">
+        <p class="eyebrow">Quarantine</p>
+        <h2>待审 · <span id="queue-count">0</span></h2>
+        <p class="queue__note">这些愿望命中了内容规则，<b>没有上墙</b>。复核后用下面复制出来的命令放行或屏蔽。</p>
+      </div>
+      <div id="queue-list"></div>
+    </section>
+
     <div id="table-host"></div>
 
     <p class="ledger-foot">
       <span>数据源：data/wishes.jsonl（由 GitHub Action 每 5 分钟从中转站归档）+ ntfy 实时缓存</span>
       <span id="foot-note"></span>
+    </p>
+    <p class="ledger-foot">
+      <span><b>安全模型</b>：愿望正文本身公开（产品设定）；署名之外的基础信息在中转站与仓库里都是密文，只有口令能解开。口令不落盘，刷新即失效。</span>
     </p>
   </div>
 </div>

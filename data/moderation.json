@@ -1,0 +1,63 @@
+{
+  "_note": "内容与格式审查规则。改完这个文件提交即可生效，采集器每 5 分钟跑一次会重新读取。",
+  "limits": {
+    "nameMin": 1,
+    "nameMax": 24,
+    "wishMin": 2,
+    "wishMax": 160,
+    "maxLinks": 0,
+    "maxRepeatRun": 8,
+    "maxSameRatio": 0.75
+  },
+  "rate": {
+    "perDevicePerHour": 6,
+    "perRunLimit": 120,
+    "perContentPerDay": 1,
+    "archiveCap": 20000,
+    "anonymousPerHour": 20,
+    "_note": "perDevicePerHour 需要浏览器送来可解密的设备标识；没有标识的（匿名桶）用 anonymousPerHour 这个更紧的上限"
+  },
+  "proofOfWork": {
+    "difficulty": 4
+  },
+  "quarantine": true,
+  "bannedWords": [
+    "加微信",
+    "加我微信",
+    "微信号",
+    "扫码",
+    "代购",
+    "刷单",
+    "返利",
+    "兼职日结",
+    "日结",
+    "博彩",
+    "赌博",
+    "六合彩",
+    "时时彩",
+    "彩票",
+    "下注",
+    "色情",
+    "裸聊",
+    "约炮",
+    "成人视频",
+    "贷款",
+    "办证",
+    "发票",
+    "开票",
+    "假证",
+    "私家侦探",
+    "代开",
+    "刷粉",
+    "引流",
+    "推广",
+    "出售",
+    "毒品",
+    "枪支",
+    "迷药",
+    "开房记录",
+    "查开房",
+    "博鑫",
+    "太阳城"
+  ]
+}

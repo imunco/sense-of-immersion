@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: 22
 
-      - name: 从中转站拉取新的愿望
+      - name: 从中转站拉取新的愿望（校验 / 审查 / 限流 / 加密）
+        env:
+          WISH_ADMIN_PASSPHRASE: ${{ secrets.WISH_ADMIN_PASSPHRASE }}
         run: node scripts/collect.mjs
 
       - name: 归档并提交

@@ -1,5 +1,13 @@
-/* 放映室 —— 后台 */
+/* 放映室 —— 后台
+   安全模型：
+   · 口令不落盘，只用于 PBKDF2 派生密钥（25 万次迭代），再拿它解开校验块与站点私钥
+   · 采集到的「基本信息」是中转站上的密文 + 仓库里的密文，只有拿到口令才能在本机解开
+   · 密钥只存在内存里，刷新即失效；闲置 30 分钟自动锁定；连续错 5 次锁 60 秒
+   · 所有用户内容一律用 textContent 渲染，从不拼 innerHTML
+   · ⚠️ 愿望正文本身是公开的（产品设定），口令保护的是基本信息，不是愿望 */
 import { loadConfig, loadArchive, loadBlocked, poll, merge, config } from './store.js';
+import { deriveKey, decryptJSON } from '../../shared/crypto.js';
+import { openFromSite } from '../../shared/envelope.js';
 import { THREADS, threadById } from './config.js';
 import { mountPoster, fullDate, speakingTime, relTime } from './poster.js';
 import { loadFonts } from './fonts.js';
@@ -7,50 +15,128 @@ import { loadFonts } from './fonts.js';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
 const HK = 'yixian.hidden.v1';
-const AK = 'yixian.room.v1';
+const LK = 'yixian.lock.v2';
+const IDLE_MS = 30 * 60 * 1000;
+
+let KEY = null;       /* 口令派生密钥，只在内存 */
+let PRIV = null;      /* 站点私钥，只在内存 */
 
 const state = {
-  rows: [], filter: 'all', q: '', sort: 'desc', showHidden: false, limit: 300, cursor: 0, liveIds: new Set(), blocked: new Set()
+  rows: [], queue: [], filter: 'all', q: '', sort: 'desc', showHidden: false,
+  limit: 300, cursor: 0, liveIds: new Set(), blocked: new Set(), metaOk: 0, metaFail: 0
 };
 
-/* ---------------------------------------------------------- 口令 */
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.prototype.map.call(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
-}
+let lastActive = Date.now();
+['click', 'keydown', 'pointermove', 'touchstart'].forEach((t) =>
+  document.addEventListener(t, () => { lastActive = Date.now(); }, { passive: true }));
 
-function hiddenIds() {
-  try { return JSON.parse(localStorage.getItem(HK) || '[]'); } catch (e) { return []; }
+/* ---------------------------------------------------------- 锁定策略 */
+function lock() { try { return JSON.parse(localStorage.getItem(LK) || ''); } catch (e) { return null; } }
+function lockState() { return lock() || { fails: [], until: 0 }; }
+function saveLock(s) { try { localStorage.setItem(LK, JSON.stringify(s)); } catch (e) {} }
+
+function failed() {
+  const s = lockState();
+  const now = Date.now();
+  s.fails = (s.fails || []).filter((t) => now - t < 10 * 60 * 1000).concat([now]);
+  if (s.fails.length >= 5) { s.until = now + 60000; s.fails = []; }
+  saveLock(s);
+  return s;
 }
-function setHidden(ids) { localStorage.setItem(HK, JSON.stringify(ids)); }
+function lockedFor() {
+  const s = lockState();
+  return Math.max(0, (s.until || 0) - Date.now());
+}
+function clearLock() { saveLock({ fails: [], until: 0 }); }
+
+/* ---------------------------------------------------------- 口令 */
+async function fetchJSON(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(path + ' ' + r.status);
+  return r.json();
+}
 
 async function unlock(pass) {
   const cfg = config();
-  const hash = cfg.adminHash;
-  if (!hash) return true; /* 没设口令就直接进 */
-  return (await sha256(pass)) === hash;
+  if (!cfg.crypto || !cfg.crypto.salt) return { ok: false, msg: '还没有设置口令：先跑 node scripts/set-passphrase.mjs "口令"' };
+  let key;
+  try {
+    key = await deriveKey(pass, cfg.crypto.salt, cfg.crypto.iterations);
+  } catch (e) { return { ok: false, msg: '浏览器不支持 WebCrypto，换 Chrome / Firefox / Safari 新版。' }; }
+  let verifier;
+  try { verifier = await fetchJSON('data/private/verifier.json'); }
+  catch (e) { return { ok: false, msg: '读不到 data/private/verifier.json' }; }
+  try {
+    const v = await decryptJSON(key, verifier);
+    if (!v || !v.ok) throw new Error('bad');
+  } catch (e) { return { ok: false, msg: '口令不对。' }; }
+  KEY = key;
+  try { PRIV = await decryptJSON(key, await fetchJSON('data/private/keys.json')); } catch (e) { PRIV = null; }
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------- 解密元数据 */
+async function decryptLines(path) {
+  let text = '';
+  try { text = await (await fetch(path, { cache: 'no-store' })).text(); } catch (e) { return { items: [], failed: 0 }; }
+  const items = text.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+  const out = [];
+  let failed = 0;
+  const CHUNK = 150;
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const done = await Promise.all(items.slice(i, i + CHUNK).map(async (rec) => {
+      try { return Object.assign({ id: rec.id }, await decryptJSON(KEY, rec.e)); }
+      catch (e) { return null; }
+    }));
+    done.forEach((d) => { if (d) out.push(d); else failed++; });
+  }
+  return { items: out, failed: failed };
 }
 
 /* ---------------------------------------------------------- 读取 */
 async function load() {
+  state.metaOk = 0; state.metaFail = 0;
   const blocked = await loadBlocked();
   blocked.forEach((id) => state.blocked.add(id));
+
   const archive = await loadArchive(true);
-  state.rows = archive.slice();
+  const metas = new Map();
+  const metaRes = await decryptLines('data/private/meta.jsonl');
+  state.metaOk = metaRes.items.length;
+  state.metaFail = metaRes.failed;
+  metaRes.items.forEach((m) => metas.set(m.id, m));
+
+  state.rows = archive.map((r) => Object.assign({}, r, metas.get(r.id) || {}));
+
+  /* 队列：命中审查规则、还没上墙的 */
+  const queueRes = KEY ? await decryptLines('data/queue.jsonl') : { items: [], failed: 0 };
+  state.queue = queueRes.items;
+  state.queueFailed = queueRes.failed;
+  state.queue.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
   try {
     const recent = await poll('all');
     const ids = new Set(state.rows.map((r) => r.id));
-    recent.forEach((w) => {
+    /* 只拆最近这一批信封，老的中转消息很快就会进归档 */
+    for (const w of recent.slice(-60)) {
       if (w.relayTime) state.cursor = Math.max(state.cursor, w.relayTime);
-      if (!ids.has(w.id)) { w.__live = true; state.liveIds.add(w.id); }
-    });
-    state.rows = merge(state.rows, recent);
-  } catch (e) { /* 离线也能看归档 */ }
+      if (ids.has(w.id)) continue;
+      let meta = {};
+      if (w.env && PRIV) { try { meta = await openFromSite(PRIV, w.env); } catch (e) { state.metaFail++; } }
+      const row = Object.assign({ id: w.id, name: w.name, wish: w.wish, mood: w.mood, ts: w.ts, __live: true }, meta);
+      state.rows.push(row);
+      state.liveIds.add(w.id);
+    }
+  } catch (e) { /* 中转站不通也能看归档 */ }
+
   state.rows.forEach((r) => { if (!r.id) r.id = r.name + '|' + r.wish; });
+  state.rows.sort((a, b) => (a.ts || 0) - (b.ts || 0));
 }
 
 /* ---------------------------------------------------------- 视图 */
-/* 屏蔽与本地隐藏之后的全部数据 —— 统计口径用它 */
+function hiddenIds() { try { return JSON.parse(localStorage.getItem(HK) || '[]'); } catch (e) { return []; } }
+function setHidden(ids) { try { localStorage.setItem(HK, JSON.stringify(ids)); } catch (e) {} }
+
 function scoped() {
   let rows = state.rows.slice();
   if (!state.showHidden) {
@@ -62,7 +148,7 @@ function scoped() {
 
 function visible() {
   const now = Date.now();
-  const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const today = (function () { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
   let rows = scoped();
   if (state.filter === 'tonight') rows = rows.filter((r) => (r.ts || 0) >= today);
   else if (state.filter === 'week') rows = rows.filter((r) => (r.ts || 0) >= now - 7 * 864e5);
@@ -79,12 +165,13 @@ function deviceKey(r) { return r.dv || (r.ua || '') + '|' + (r.vp || '') + '|' +
 
 function renderLedger() {
   const rows = scoped();
-  const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const today = (function () { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
   const tonight = rows.filter((r) => (r.ts || 0) >= today).length;
   const devices = new Set(rows.map(deviceKey)).size;
   const lens = rows.map((r) => (r.wish || '').length);
   const avg = lens.length ? Math.round(lens.reduce((a, b) => a + b, 0) / lens.length) : 0;
   const longest = rows.reduce((m, r) => Math.max(m, (r.wish || '').length), 0);
+  const liveCount = rows.filter((r) => state.liveIds.has(r.id)).length;
 
   const sentence = $('#ledger-sentence');
   sentence.textContent = '';
@@ -96,9 +183,10 @@ function renderLedger() {
 
   const line = $('#ledger-line');
   line.textContent = '';
-  const liveCount = rows.filter((r) => state.liveIds.has(r.id)).length;
   [['总计', rows.length + ' 条'], ['独立设备', devices + ' 台'], ['平均', avg + ' 字'], ['最长', longest + ' 字'],
-   ['未归档', liveCount + ' 条']].forEach((pair) => {
+   ['未归档', liveCount + ' 条'], ['待审', state.queue.length + ' 条'],
+   ['元数据', state.metaOk + ' 条' + (state.metaFail ? '（' + state.metaFail + ' 条解不开）' : '')]
+  ].forEach((pair) => {
     const s = document.createElement('span');
     s.textContent = pair[0] + ' ';
     const v = document.createElement('b');
@@ -116,9 +204,8 @@ function renderTimeline() {
   base.setHours(0, 0, 0, 0);
   for (let i = 29; i >= 0; i--) {
     const d = new Date(base.getTime() - i * 864e5);
-    const next = d.getTime() + 864e5;
-    days.push({ t: d.getTime(), label: (d.getMonth() + 1) + '/' + d.getDate(), n: 0 });
-    days[days.length - 1].next = next;
+    const t = d.getTime();
+    days.push({ t: t, next: t + 864e5, label: (d.getMonth() + 1) + '/' + d.getDate(), n: 0 });
   }
   scoped().forEach((r) => {
     const ts = r.ts || 0;
@@ -127,8 +214,7 @@ function renderTimeline() {
     }
   });
   const max = Math.max(1, days.reduce((m, d) => Math.max(m, d.n), 0));
-  const total = days.reduce((a, d) => a + d.n, 0);
-  $('#timeline-total').textContent = '共 ' + total + ' 条 · 峰值 ' + max + ' 条/日';
+  $('#timeline-total').textContent = '共 ' + days.reduce((a, d) => a + d.n, 0) + ' 条 · 峰值 ' + max + ' 条/日';
   $('#axis-from').textContent = days[0].label;
   days.forEach((d) => {
     const bar = document.createElement('div');
@@ -137,6 +223,47 @@ function renderTimeline() {
     bar.dataset.tip = d.label + ' · ' + d.n + ' 条';
     bar.title = d.label + ' · ' + d.n + ' 条';
     host.appendChild(bar);
+  });
+}
+
+function renderQueue() {
+  const panel = $('#queue-panel');
+  const host = $('#queue-list');
+  $('#queue-count').textContent = String(state.queue.length);
+  panel.hidden = state.queue.length === 0;
+  host.textContent = '';
+  if (!state.queue.length) return;
+  state.queue.forEach((q) => {
+    const row = document.createElement('article');
+    row.className = 'queue__item';
+    const head = document.createElement('p');
+    head.className = 'queue__meta';
+    head.textContent = q.id + ' · ' + fullDate(q.ts) + ' ' + speakingTime(q.ts);
+    const body = document.createElement('p');
+    body.className = 'queue__wish';
+    const who = document.createElement('b');
+    who.textContent = q.name + '：';
+    body.appendChild(who);
+    body.appendChild(document.createTextNode(q.wish || ''));
+    const why = document.createElement('p');
+    why.className = 'queue__why';
+    why.textContent = '拦截理由：' + (q.reason || '未说明');
+    const acts = document.createElement('div');
+    acts.className = 'queue__acts';
+    [['复制放行命令', 'WISH_ADMIN_PASSPHRASE=<口令> node scripts/moderate.mjs approve ' + q.id],
+     ['复制屏蔽命令', 'node scripts/moderate.mjs reject ' + q.id]
+    ].forEach((pair) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn--quiet';
+      btn.type = 'button';
+      btn.textContent = pair[0];
+      btn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(pair[1]); btn.textContent = '已复制'; } catch (e) { btn.textContent = pair[1]; }
+      });
+      acts.appendChild(btn);
+    });
+    row.appendChild(head); row.appendChild(body); row.appendChild(why); row.appendChild(acts);
+    host.appendChild(row);
   });
 }
 
@@ -192,15 +319,9 @@ function renderTable() {
     tdWish.className = 'cell-wish';
     tdWish.textContent = r.wish;
     if (state.blocked.has(r.id)) {
-      const tag = document.createElement('span');
-      tag.className = 'tag-live';
-      tag.textContent = '已屏蔽';
-      tdWish.appendChild(tag);
+      tdWish.appendChild(tag('已屏蔽'));
     } else if (state.liveIds.has(r.id)) {
-      const tag = document.createElement('span');
-      tag.className = 'tag-live';
-      tag.textContent = '未归档';
-      tdWish.appendChild(tag);
+      tdWish.appendChild(tag('未归档'));
     }
     tr.appendChild(tdWish);
 
@@ -245,10 +366,15 @@ function renderTable() {
   }
 }
 
+function tag(text) {
+  const s = document.createElement('span');
+  s.className = 'tag-live';
+  s.textContent = text;
+  return s;
+}
+
 /* ---------------------------------------------------------- 抽屉 */
-let drawerRow = null;
 function openDrawer(r) {
-  drawerRow = r;
   const host = $('#drawer');
   host.textContent = '';
 
@@ -275,13 +401,13 @@ function openDrawer(r) {
     ['编号', r.id],
     ['写下于', fullDate(r.ts) + ' ' + speakingTime(r.ts) + '（' + relTime(r.ts) + '）'],
     ['丝线', threadById(r.mood).name + ' · ' + threadById(r.mood).en],
-    ['语言', r.lg || '—'],
-    ['时区', r.tz || '—'],
-    ['设备', r.ua || '—'],
-    ['视口', r.vp || '—'],
-    ['来源页', r.ref || 'direct'],
-    ['来访次数', r.n ? '第 ' + r.n + ' 次' : '—'],
-    ['设备标识', r.dv || '—'],
+    ['语言', r.lg || '（未解密）'],
+    ['时区', r.tz || '（未解密）'],
+    ['设备', r.ua || '（未解密）'],
+    ['视口', r.vp || '（未解密）'],
+    ['来源页', r.ref || '（未解密）'],
+    ['来访次数', r.n ? '第 ' + r.n + ' 次' : '（未解密）'],
+    ['设备标识', r.dv || '（未解密）'],
     ['入口', r.src || 'web'],
     ['归档', state.blocked.has(r.id) ? '已屏蔽（不进蛛网）' : (state.liveIds.has(r.id) ? '尚未归档（等采集器写入）' : '已归档')]
   ];
@@ -319,11 +445,6 @@ function openDrawer(r) {
   });
   actions.appendChild(hide);
   actions.appendChild(cmd);
-  const open = document.createElement('a');
-  open.className = 'btn btn--quiet';
-  open.textContent = '看它的海报';
-  open.href = 'index.html#/web';
-  actions.appendChild(open);
   host.appendChild(actions);
 
   host.hidden = false;
@@ -348,19 +469,28 @@ function download(name, text, type) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
+/* 防 CSV 公式注入：Excel 会把 = + - @ 开头的单元格当公式执行 */
 function csvCell(v) {
-  const s = String(v == null ? '' : v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  let s = String(v == null ? '' : v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+const COLUMNS = [
+  ['时间', (r) => fullDate(r.ts) + ' ' + speakingTime(r.ts)],
+  ['署名', (r) => r.name],
+  ['愿望', (r) => r.wish],
+  ['丝线', (r) => threadById(r.mood).name],
+  ['语言', (r) => r.lg], ['时区', (r) => r.tz], ['设备', (r) => r.ua],
+  ['视口', (r) => r.vp], ['来源页', (r) => r.ref], ['来访次数', (r) => r.n],
+  ['设备标识', (r) => r.dv], ['编号', (r) => r.id]
+];
+
 function exportCsv() {
-  const head = ['时间', '署名', '愿望', '丝线', '语言', '时区', '设备', '视口', '来源页', '来访次数', '编号'];
-  const rows = visible().map((r) => [
-    fullDate(r.ts) + ' ' + speakingTime(r.ts), r.name, r.wish, threadById(r.mood).name,
-    r.lg, r.tz, r.ua, r.vp, r.ref, r.n, r.id
-  ]);
-  const csv = '\ufeff' + [head].concat(rows).map((row) => row.map(csvCell).join(',')).join('\r\n');
-  download('wishes-' + Date.now() + '.csv', csv, 'text/csv;charset=utf-8');
+  const rows = visible();
+  const head = COLUMNS.map((c) => c[0]);
+  const body = rows.map((r) => COLUMNS.map((c) => csvCell(c[1](r))));
+  download('wishes-' + Date.now() + '.csv', '\ufeff' + [head].concat(body).map((row) => row.join(',')).join('\r\n'), 'text/csv;charset=utf-8');
 }
 
 function exportJson() {
@@ -368,47 +498,97 @@ function exportJson() {
 }
 
 /* ---------------------------------------------------------- 启动 */
-function renderAll() { renderLedger(); renderTimeline(); renderTable(); }
+function renderAll() { renderLedger(); renderTimeline(); renderTable(); renderQueue(); }
 
 async function enter() {
   $('#gate').hidden = true;
   $('#room').hidden = false;
-  await load();
+  $('#proj-status').textContent = '正在解密元数据…';
+  try {
+    await load();
+  } catch (e) {
+    $('#proj-status').textContent = '读取失败：' + e.message;
+  }
   renderAll();
-  $('#proj-status').textContent = '已连上蛛丝 · ' + new Date().toLocaleTimeString('zh-CN');
-  $('#foot-note').textContent = '中转站 ' + (config().endpoint || '') + '/' + (config().topic || '');
+  $('#proj-status').textContent = '已连上蛛丝 · ' + new Date().toLocaleTimeString('zh-CN') +
+    ' · 元数据 ' + state.metaOk + ' 条' + (state.metaFail ? '（' + state.metaFail + ' 条解不开）' : '') +
+    ' · 待审 ' + state.queue.length + ' 条';
+
   setInterval(async () => {
+    if (!KEY) return;
     try {
       const recent = await poll(state.cursor || 'all');
       if (!recent.length) return;
       let changed = false;
       const ids = new Set(state.rows.map((r) => r.id));
-      recent.forEach((w) => {
+      for (const w of recent) {
         if (w.relayTime) state.cursor = Math.max(state.cursor, w.relayTime);
-        if (!ids.has(w.id)) { w.__live = true; state.liveIds.add(w.id); changed = true; }
-      });
-      if (changed) { state.rows = merge(state.rows, recent); renderAll(); }
+        if (ids.has(w.id)) continue;
+        let meta = {};
+        if (w.env && PRIV) { try { meta = await openFromSite(PRIV, w.env); } catch (e) {} }
+        state.rows.push(Object.assign({ id: w.id, name: w.name, wish: w.wish, mood: w.mood, ts: w.ts, __live: true }, meta));
+        state.liveIds.add(w.id);
+        changed = true;
+      }
+      if (changed) renderAll();
     } catch (e) {}
   }, 20000);
+}
+
+function lockNow(reason) {
+  KEY = null; PRIV = null;
+  if (reason) { try { sessionStorage.setItem('yixian.lockmsg', reason); } catch (e) {} }
+  location.reload();
 }
 
 async function boot() {
   loadFonts();
   await loadConfig();
-  if (sessionStorage.getItem(AK) === '1') { enter(); return; }
-  $('#gate-form').addEventListener('submit', async (e) => {
+
+  setInterval(() => {
+    if (KEY && Date.now() - lastActive > IDLE_MS) lockNow('闲置超过 30 分钟，已自动锁定。');
+  }, 20000);
+
+  const form = $('#gate-form');
+  const passEl = $('#gate-pass');
+  const errEl = $('#gate-err');
+  const btn = form.querySelector('button[type=submit]');
+
+  const tickLock = () => {
+    const left = lockedFor();
+    if (left > 0) {
+      btn.disabled = true;
+      passEl.disabled = true;
+      errEl.textContent = '尝试次数过多，请等 ' + Math.ceil(left / 1000) + ' 秒。';
+      setTimeout(tickLock, 1000);
+    } else {
+      btn.disabled = false;
+      passEl.disabled = false;
+    }
+  };
+  tickLock();
+  passEl.focus();
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const pass = $('#gate-pass').value;
-    if (await unlock(pass)) { sessionStorage.setItem(AK, '1'); enter(); }
-    else { $('#gate-err').textContent = '口令不对。再想想。'; }
+    if (lockedFor() > 0) return;
+    btn.disabled = true;
+    btn.textContent = '正在校验…';
+    const res = await unlock(passEl.value);
+    passEl.value = '';
+    if (res.ok) { clearLock(); enter(); return; }
+    const s = failed();
+    errEl.textContent = res.msg + ((s.until || 0) > Date.now() ? ' 连续错太多次，锁 60 秒。' : '');
+    btn.disabled = false;
+    btn.textContent = '进入放映室';
+    tickLock();
   });
-  $('#gate-pass').focus();
 }
 
 $('#refresh') && $('#refresh').addEventListener('click', async () => { await load(); renderAll(); });
 $('#export-csv') && $('#export-csv').addEventListener('click', exportCsv);
 $('#export-json') && $('#export-json').addEventListener('click', exportJson);
-$('#sign-out') && $('#sign-out').addEventListener('click', () => { sessionStorage.removeItem(AK); location.reload(); });
+$('#sign-out') && $('#sign-out').addEventListener('click', () => lockNow(null));
 $('#q') && $('#q').addEventListener('input', (e) => { state.q = e.target.value.trim(); state.limit = 300; renderTable(); });
 $('#range-chips') && $('#range-chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip'); if (!b) return;
@@ -420,7 +600,7 @@ $('#toggle-hidden') && $('#toggle-hidden').addEventListener('click', (e) => {
   state.showHidden = !state.showHidden;
   e.target.classList.toggle('is-on', state.showHidden);
   e.target.textContent = state.showHidden ? '隐藏已隐藏' : '显示已隐藏';
-  renderTable();
+  renderAll();
 });
 $('#scrim') && $('#scrim').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });

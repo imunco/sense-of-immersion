@@ -2,9 +2,9 @@
 import { loadFonts } from './fonts.js';
 import { THREADS, threadById } from './config.js';
 import {
-  loadConfig, loadArchive, loadBlocked, poll, publish, merge, deviceInfo, visitCount,
+  loadConfig, loadArchive, loadBlocked, loadModeration, poll, publish, merge, deviceInfo, visitCount,
   newId, remember, myWishes, isMine, queuePending, flushPending,
-  encodeShare, decodeShare, config
+  encodeShare, decodeShare, config, screenText, mineProof, sealMeta
 } from './store.js';
 import { renderPoster, fitPoster, speakingTime, fullDate, relTime, mountPoster } from './poster.js';
 import { SilkWeb } from './web.js';
@@ -15,8 +15,11 @@ const $$ = (sel) => Array.prototype.slice.call(document.querySelectorAll(sel));
 const state = {
   name: '', wish: '', mood: 'silk',
   all: [], cursor: 0, seen: new Set(), blocked: new Set(),
-  last: null, filter: 'all', visit: 1, web: null, booted: false
+  last: null, filter: 'all', visit: 1, web: null, booted: false,
+  wishShownAt: 0, submitting: false
 };
+
+const sleep = (ms) => new Promise(function (r) { setTimeout(r, ms); });
 
 /* ------------------------------------------------------------ 小工具 */
 let toastTimer = 0;
@@ -68,6 +71,7 @@ function cut() {
 }
 
 function applyView(view) {
+  if (view === 'wish' && currentView !== 'wish') state.wishShownAt = Date.now();
   currentView = view;
   $$('.act').forEach(function (sec) {
     sec.classList.toggle('is-current', sec.dataset.view === view);
@@ -328,22 +332,53 @@ function renderReveal(rec) {
 }
 
 async function submit() {
+  if (state.submitting) return;
   const name = state.name.trim().slice(0, 24);
   const wish = state.wish.trim().slice(0, 160);
   const err = $('#wish-error');
+  const btn = $('#submit-wish');
+
   if (!name) { err.textContent = '还没有署名。'; go('#/cast'); return; }
   if (wish.length < 2) { err.textContent = '愿望太短了，再写一句吧。'; return; }
+
+  /* 蜜罐：真人看不见这个输入框，填了就是机器人 */
+  const hp = $('#hp');
+  if (hp && hp.value) { err.textContent = '提交被拦下了。'; return; }
+
+  const reason = screenText(name, wish);
+  if (reason) { err.textContent = reason; return; }
   err.textContent = '';
 
-  const rec = Object.assign({
-    id: newId(),
-    name: name,
-    wish: wish,
-    mood: state.mood,
-    ts: Date.now(),
-    src: 'web',
-    n: state.visit
-  }, deviceInfo());
+  /* 太快填完的当机器人 —— 真人不会被卡，等一下就好 */
+  const elapsed = Date.now() - (state.wishShownAt || Date.now());
+  if (elapsed < 2400) await sleep(2400 - elapsed);
+
+  state.submitting = true;
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '正在系上这条丝…';
+
+  const rec = {
+    id: newId(), name: name, wish: wish, mood: state.mood, ts: Date.now()
+  };
+
+  /* 基本信息在浏览器里就密封好，中转站和仓库里都只有密文 */
+  const meta = Object.assign(deviceInfo(), { src: 'web', n: state.visit });
+  const env = await sealMeta(meta);
+
+  const proof = await mineProof(rec.id, null, function (n) {
+    btn.textContent = '正在系上这条丝… ' + Math.round(n / 1000) + 'k';
+  });
+
+  const payload = {
+    id: rec.id, name: rec.name, wish: rec.wish, mood: rec.mood, ts: rec.ts,
+    pow: proof.pow, hp: '', ft: Date.now() - (state.wishShownAt || Date.now()),
+    env: env
+  };
+
+  btn.textContent = label;
+  state.submitting = false;
+  btn.disabled = wish.length < 2;
 
   state.last = rec;
   remember(rec);
@@ -357,10 +392,10 @@ async function submit() {
   setTimeout(function () { window.scrollTo({ top: 0, behavior: 'auto' }); }, 0);
 
   try {
-    await publish(rec);
+    await publish(payload);
     toast('愿望已挂上蛛丝');
   } catch (e) {
-    queuePending(rec);
+    queuePending(payload);
     toast('网络不太稳，先替你存在本机，稍后自动补发');
   }
 }
@@ -428,6 +463,7 @@ function bind() {
 
 async function boot() {
   await loadConfig();
+  await loadModeration();
   state.visit = visitCount();
 
   state.name = session('name') || '';

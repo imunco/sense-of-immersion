@@ -99,7 +99,12 @@
           <div class="threads__row" id="thread-picks"></div>
         </fieldset>
 
-        <p class="privacy">蛛网是公开的。提交后我们会保存这条愿望、你的署名、写下它的时间，以及语言与时区这类基础信息，用于后台统计。</p>
+        <div class="sr" aria-hidden="true">
+          <label for="hp">这一栏请留空</label>
+          <input id="hp" name="hp" type="text" tabindex="-1" autocomplete="off">
+        </div>
+        <p class="privacy"><b>蛛网是公开的</b>：你的署名和这条愿望，所有人都能在蛛网上读到。<br>
+          除此之外还会记录写下的时间，以及语言、时区、设备、来源这类基础信息——这些在离开你的浏览器之前就已经加密，中转站和仓库里都只有密文，只有持有后台口令的人才解得开。不收集 IP，不做定位。</p>
         <p class="wish-error" id="wish-error" role="status" aria-live="polite"></p>
         <button class="btn btn--thread" id="submit-wish" type="button" disabled>牵起这条丝</button>
       </div>

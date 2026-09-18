@@ -243,3 +243,28 @@
   .ledger-table { font-size: var(--t-xs); }
   .cell-wish { min-width: 10rem; }
 }
+/* ---------------------------------------------------------- 待审队列 */
+.queue { padding: var(--s-4) 0 var(--s-5); border-bottom: 1px solid var(--rule-light); }
+.queue__head { margin-bottom: var(--s-3); }
+.queue__head h2 {
+  font-family: var(--font-cjk);
+  font-weight: 700;
+  font-size: var(--t-lg);
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  margin: 0.3em 0 0.4em;
+}
+.queue__head h2 span { color: var(--dusk); font-variant-numeric: tabular-nums; }
+.queue__note { font-family: var(--font-cjk); font-size: var(--t-sm); letter-spacing: 0.06em; color: var(--ink-faint); max-width: 62ch; line-height: 1.9; }
+.queue__note b { color: var(--dusk); font-weight: 700; }
+.queue__item {
+  display: grid;
+  gap: 0.5em;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--rule-light);
+}
+.queue__meta { font-family: var(--font-ui); font-size: var(--t-micro); letter-spacing: 0.16em; color: var(--ink-ghost); }
+.queue__wish { font-family: var(--font-cjk); font-size: var(--t-base); line-height: 1.85; letter-spacing: 0.05em; color: var(--ink); }
+.queue__wish b { font-weight: 700; margin-right: 0.2em; }
+.queue__why { font-family: var(--font-cjk); font-size: var(--t-xs); letter-spacing: 0.06em; color: var(--dusk); }
+.queue__acts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: 0.2em; }
