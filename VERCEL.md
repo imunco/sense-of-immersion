@@ -1,4 +1,23 @@
-# 把归档触发搬到 Vercel
+# 归档触发（Vercel）—— 已部署
+
+**状态：已上线并验证通过。**
+
+| | |
+|---|---|
+| 服务地址 | https://yixian-archive.vercel.app |
+| 健康检查 | https://yixian-archive.vercel.app/api/health |
+| 触发端点 | https://yixian-archive.vercel.app/api/poke |
+| Vercel 项目 | `xcdh520-githubs-projects/yixian-archive` |
+| 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS` |
+
+实测：线上提交一条愿望 → 浏览器打 `/api/poke` → GitHub Actions 在几秒内被叫醒 →
+愿望进归档。**全程不需要本机开机，也不依赖 GitHub 那个慢三小时的定时任务。**
+
+> ⚠️ `GITHUB_DISPATCH_TOKEN` 是放在 Vercel 环境变量里的 GitHub 细粒度令牌。
+> 如果你在 GitHub 上把它吊销或重新生成，记得同步更新：
+> `npx vercel env rm GITHUB_DISPATCH_TOKEN production` 然后重新 add，再 `npx vercel --prod`。
+
+---
 
 ## 为什么
 

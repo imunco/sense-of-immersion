@@ -138,18 +138,26 @@ node scripts/remove-wish.mjs <id> --push                                    # �
 
 ## 归档与持久化
 
-**实测结论：GitHub 的 `on.schedule` 在这个仓库从来没有触发过。**
-（`gh run list --event schedule` 一直是空的；public 仓库、默认分支 main、workflow state 为 active，
-两个不同的 workflow 都一样，等过 20 分钟以上。）所以归档不能只靠它。
+**实测结论：GitHub 的 `on.schedule` 极不可靠。** 建好之后 3 小时才第一次触发，
+之后也不按 5 分钟来。所以归档的主触发搬到了 Vercel（见 [VERCEL.md](VERCEL.md)）：
+
+```
+访客提交 → 网页 POST /api/poke（浏览器里没有任何令牌）
+        → Vercel 函数带着令牌 dispatch GitHub Actions
+        → 采集 / 审查 / 加密 / 提交 → Pages 生效
+```
+
+实测从提交到入库约 1 分钟，且完全不依赖这台电脑开机。
 
 现在有四条路，按可靠性排序：
 
 | 路径 | 怎么触发 | 状态 |
 |---|---|---|
-| **本地守夜人** | Windows 计划任务每 15 分钟跑一次 `scripts/watchdog.mjs` | ✅ 主力 |
+| **Vercel 事件触发** | 访客一提交，网页就打 `/api/poke`，服务端去 dispatch Actions | ✅ **主力**（秒级） |
+| 本地守夜人 | Windows 计划任务每 15 分钟跑一次 `scripts/watchdog.mjs` | ✅ 第二道 |
 | 任意 push | 一 push 就顺手归档一次 | ✅ |
 | 手动 | `gh workflow run collect-wishes` | ✅ |
-| GitHub 定时 | `cron: '*/5 * * * *'` | ❌ 实测从未触发 |
+| GitHub 定时 | `cron: '*/5 * * * *'` | ⚠️ 会跑，但 3 小时才启动一次，不可依赖 |
 
 再加两条兜底，让归档滞后也不会丢东西：
 
