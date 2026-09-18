@@ -5,9 +5,13 @@
 一个沉浸式的许愿馆。你写下名字和愿望，它会被冲印成一张**还没有拍出来的电影海报**，
 然后挂到蛛网上，成为一颗露珠。
 
-**线上地址**
-- 许愿馆 → https://imunco.github.io/sense-of-immersion/
-- 放映室（后台）→ https://imunco.github.io/sense-of-immersion/admin.html
+**线上地址（全部由 Vercel 一处提供）**
+- 许愿馆 → https://yixian-archive.vercel.app/
+- 放映室（后台）→ https://yixian-archive.vercel.app/admin.html —— **页面上没有入口，只能手输网址**
+- 归档接口 → `/api/health`（健康检查）、`/api/poke`（触发归档）
+
+> GitHub Pages 已停用。仓库只作为源码与数据的存放地，
+> 线上服务一律走 Vercel（页面、资源、数据、接口同一个域名）。
 
 ---
 
@@ -23,15 +27,20 @@
 选「仅自己可见」的愿望：正文在**离开浏览器之前**就用站点公钥加密了，
 中转站和公开仓库里都只有密文，蛛网上也不会出现。只有后台口令能解开。
 
-愿望会存进浏览器本机（刷新不丢），同时发往公共中转站，由 GitHub Action 每 5 分钟归档进仓库。
-复制分享链接的人会直接看到那张海报。
+愿望会先存进浏览器本机（刷新不丢），同时发往公共中转站；
+提交的一瞬间，网页会去叫醒 GitHub Actions 把它归档进仓库，再由 Vercel 重新部署上线——
+实测从提交到出现在蛛网上约 1 分钟。复制分享链接的人会直接看到那张海报。
 
 ---
 
 ## 后台：放映室
 
-`admin.html`。口令的 SHA-256 存在 `data/config.json` 的 `adminHash` 里（当前口令在交付说明里）。
-第一次部署后请立刻换掉它。
+`https://yixian-archive.vercel.app/admin.html` —— **站内没有任何链接指向它，需要手输网址。**
+
+口令不落盘：仓库里只有 PBKDF2 的盐、迭代次数，以及一段用派生密钥加密的校验块
+（`data/private/verifier.json`）。解锁时浏览器本地跑 25 万次 PBKDF2，
+密钥只存在内存里，刷新即失效，闲置 30 分钟自动锁定。
+换口令用 `node scripts/set-passphrase.mjs "新口令" "旧口令"`，**不会丢历史数据**。
 
 - 一句话概览：「今夜，蛛丝上多了 N 个愿望。」
 - 近 30 天时间线。

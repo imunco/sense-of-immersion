@@ -4,11 +4,27 @@
 
 | | |
 |---|---|
-| 服务地址 | https://yixian-archive.vercel.app |
+| 站点 | https://yixian-archive.vercel.app/ （许愿馆） |
+| 后台 | https://yixian-archive.vercel.app/admin.html （无站内入口） |
 | 健康检查 | https://yixian-archive.vercel.app/api/health |
 | 触发端点 | https://yixian-archive.vercel.app/api/poke |
 | Vercel 项目 | `xcdh520-githubs-projects/yixian-archive` |
 | 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS` |
+| GitHub Pages | **已停用** |
+
+### 站点是怎么输出的
+
+`build-vercel.mjs` 会把仓库根目录的 `index.html`、`admin.html`、`assets/`、`data/`、`shared/`、`robots.txt`
+收进 `public/`（Vercel 的静态输出目录），而 `api/` 仍然被当作函数。
+所以仓库结构不用动 —— GitHub Action 照旧往根目录的 `data/` 写，构建时再同步进 `public/`。
+
+> ⚠️ `shared/` 必须一起输出：`assets/js/store.js` 会 `import '../../shared/sha256.js'`，
+> 漏了它整个页面的脚本都不会执行（页面看起来"没坏"，但所有数据都是空的）。
+
+### 数据是怎么更新的
+
+采集器提交 → Vercel 的 Git 集成自动重新部署（实测约 11 秒）→ 新数据上线。
+不需要额外的 deploy hook。
 
 实测：线上提交一条愿望 → 浏览器打 `/api/poke` → GitHub Actions 在几秒内被叫醒 →
 愿望进归档。**全程不需要本机开机，也不依赖 GitHub 那个慢三小时的定时任务。**
