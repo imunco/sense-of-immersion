@@ -137,7 +137,10 @@ async function load() {
       if (w.relayTime) state.cursor = Math.max(state.cursor, w.relayTime);
       if (ids.has(w.id)) continue;
       let meta = {};
-      if (w.env && PRIV) { try { meta = await openFromSite(PRIV, w.env); } catch (e) { state.metaFail++; } }
+      /* 已屏蔽的中转消息不必再拆信封，也不算解密失败 */
+      if (w.env && PRIV && !state.blocked.has(w.id)) {
+        try { meta = await openFromSite(PRIV, w.env); } catch (e) { state.metaFail++; }
+      }
       const row = Object.assign({ id: w.id, name: w.name, wish: w.wish, mood: w.mood, ts: w.ts, __live: true }, meta);
       state.rows.push(row);
       state.liveIds.add(w.id);
