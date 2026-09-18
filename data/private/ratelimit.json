@@ -1,16 +1,6 @@
 {
-  "devices": {
-    "54946b8b8b44d01f10336a6c": [
-      1789771695533
-    ]
-  },
-  "content": {
-    "57776ca50cd303bafe89802d90a0bd9f41f3948c647d57ef142b42dd9ec8c2fc": [
-      1789771695533
-    ]
-  },
-  "global": [
-    1789771695533
-  ],
-  "total": 1
+  "devices": {},
+  "content": {},
+  "global": [],
+  "total": 0
 }
