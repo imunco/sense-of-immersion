@@ -46,15 +46,22 @@ await goto(BASE + '/');
 await page.evaluate(() => document.fonts.ready).catch(() => {});
 await page.waitForFunction(() => !!window.__yixian, { timeout: 40000 }).catch(() => {});
 await wait(800);
-/* 说明：线上前台**没有**调用 loadFonts()（只有放映室会调），所以这里
-   document.documentElement.dataset.cjk 是空的、中文走系统宋体栈 —— 这是现状，
-   不是这次回归要管的事，先如实打出来。 */
 console.log('前台:', JSON.stringify(await page.evaluate(() => ({
   cjk: document.documentElement.dataset.cjk,
   heroCount: document.querySelector('#hero-count').textContent,
   wishes: window.__yixian.all.length,
   webEmptyShown: !document.querySelector('#web-empty').hidden
 }))));
+/* 中文那套 webfont 接线断了要能发现（之前 app.js 只 import 没调用，前台一直用的是系统宋体）。
+   但**不**要求它必须 'loaded' —— 三个 CDN 都在墙外，连不上是设计接受的降级（'fallback'）。
+   真正要抓的是「压根没调用」这一种：那时 dataset.cjk 是空的。 */
+const cjk = await page.evaluate(() => document.documentElement.dataset.cjk || '');
+if (!cjk) {
+  console.log('  ✗ 前台没有调用 loadFonts()：dataset.cjk 是空的，中文只会走系统宋体栈');
+  problems.push('cjk: 前台未调用 loadFonts()');
+} else if (cjk === 'fallback') {
+  console.log('  · 中文 webfont 没装上（三个 CDN 都不通），已退到系统宋体栈 —— 设计接受');
+}
 await page.evaluate(() => { location.hash = '#/web'; });
 await wait(2000);
 console.log('蛛网:', JSON.stringify(await page.evaluate(() => ({

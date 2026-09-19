@@ -1107,6 +1107,12 @@ async function boot() {
 
   render();
 
+  /* 中文宋体（Noto Serif SC）：体积太大，运行时按 Google → loli → geekzu 依次试，
+     三个都不通就退到系统宋体栈（assets/js/fonts.js；--font-cjk 的第一位就是它）。
+     这里**不 await**：字体晚到不该把页面卡在路上，换字那一下是这套设计接受的成本。
+     之前这行是漏掉的 —— 公开站只 import 了没调用，所以前台中文一直走的是系统宋体。 */
+  loadFonts().catch(function () {});
+
   try {
     await loadAll();
   } catch (e) {

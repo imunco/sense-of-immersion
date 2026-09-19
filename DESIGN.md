@@ -44,6 +44,8 @@
 字体装载策略：三个拉丁字体**自托管**（合计约 290KB，`scripts/fetch-fonts.mjs` 生成）；
 中文体积太大，运行时按 Google → `fonts.loli.net` → `fonts.geekzu.org` 顺序试，
 全不通就退到系统宋体栈（`assets/js/fonts.js`）。
+接线在 `assets/js/app.js` 的 `boot()` 与 `admin.js`，都**不 await** —— 字体晚到不该把页面挡在半路，
+所以首屏可能先是一版系统宋体、随后换过去。
 
 ## 排版尺度
 
