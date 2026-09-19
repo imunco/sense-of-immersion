@@ -14,9 +14,22 @@
   "wrote": {
     "7fdba5bc34aaa247c80b18d0": 1789799479618
   },
-  "reads": {},
-  "readIps": {},
-  "readGlobal": [],
-  "wishReads": {},
+  "reads": {
+    "sid:3btUsmv-ezIOdu01": {
+      "n": 1,
+      "t": 1789845537981
+    }
+  },
+  "readIps": {
+    "7c160c6c4df1c9d55bdf02a2": [
+      1789845537981
+    ]
+  },
+  "readGlobal": [
+    1789845537981
+  ],
+  "wishReads": {
+    "w_mu80e2lw_epmvih": 1789845537981
+  },
   "delNonces": []
 }
