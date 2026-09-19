@@ -1,9 +1,21 @@
 {
-  "devices": {},
-  "content": {},
-  "global": [],
-  "total": 0,
-  "wrote": {},
+  "devices": {
+    "7fdba5bc34aaa247c80b18d0": [
+      1789799479618
+    ]
+  },
+  "content": {
+    "d089cf16adaba361fe8b2f7b4e5b2568de50a8c84bb514fd1fd7d4b068f50113": [
+      1789799479618
+    ]
+  },
+  "global": [
+    1789799479618
+  ],
+  "total": 1,
+  "wrote": {
+    "7fdba5bc34aaa247c80b18d0": 1789799479618
+  },
   "reads": {},
   "readIps": {},
   "readGlobal": [],
