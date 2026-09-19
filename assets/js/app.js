@@ -25,7 +25,8 @@ const state = {
   reads: {}, effReads: {}, localRead: new Map(), mends: {}, byCode: new Map(), cooldown: 0,
   screenTimer: 0, screenWish: null, pendingCode: '',
   echo: { data: null, version: '', view: 'cloud', cloud: null, busy: false },
-  share: 'link', shareTimer: 0
+  share: 'link', shareTimer: 0,
+  tipWish: null            /* 蛛网上现在摊开着哪一张提示卡（手机上要能点开它） */
 };
 
 const sleep = (ms) => new Promise(function (r) { setTimeout(r, ms); });
@@ -144,7 +145,7 @@ function markRead(wish) {
   refreshScreeningSilk();
   /* 提示里那句话也得跟着换，不能露珠变了它还说旧的 */
   if (state.web && state.web.hover && state.web.hover.wish.id === wish.id) {
-    showTip(state.web.hover.wish, state.web.hover.pos);
+    showTip(state.web.hover.wish, state.web.hover.pos, !!state.web.touchId);
   }
 }
 
@@ -374,9 +375,13 @@ function mountWeb() {
   $('#web-empty').hidden = filtered().length > 0;
 }
 
-function showTip(wish, pos) {
+/* touch = true 表示这是手指点出来的卡片。
+   桌面上「悬停看一眼、点一下翻开」；手机没有悬停，于是改成
+   「点一下看一眼、再点一下（或者点这张卡）翻开」。
+   卡片位置也分开：手机上放到露珠**上方**，免得被自己的手指压住。 */
+function showTip(wish, pos, touch) {
   const tip = $('#web-tip');
-  if (!wish) { tip.classList.remove('is-on'); return; }
+  if (!wish) { tip.classList.remove('is-on'); tip.classList.remove('is-touch'); state.tipWish = null; return; }
   tip.textContent = '';
   const name = document.createElement('p');
   name.className = 'web-tip__name';
@@ -392,10 +397,23 @@ function showTip(wish, pos) {
   silk.className = 'web-tip__silk' + (st.id === 'loose' ? ' is-loose' : '');
   silk.textContent = st.name + ' · ' + st.line;
   tip.appendChild(name); tip.appendChild(body); tip.appendChild(meta); tip.appendChild(silk);
+  if (touch) {
+    const go = document.createElement('p');
+    go.className = 'web-tip__go';
+    go.textContent = '点这张卡，翻到那张海报';
+    tip.appendChild(go);
+  }
+  tip.classList.toggle('is-touch', !!touch);
+  state.tipWish = wish;
   tip.classList.add('is-on');
+  /* .is-touch 得先加上去再量尺寸（手机上的卡片能滚、宽度也可能不同） */
   const wrap = tip.parentElement.getBoundingClientRect();
-  const x = Math.max(12, Math.min(pos.x + 18, wrap.width - tip.offsetWidth - 12));
-  const y = Math.max(12, Math.min(pos.y + 14, wrap.height - tip.offsetHeight - 12));
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let x = touch ? pos.x - tw / 2 : pos.x + 18;
+  let y = touch ? pos.y - th - 16 : pos.y + 14;
+  if (touch && y < 12) y = pos.y + 26;   /* 上面放不下就翻到下面 */
+  x = Math.max(12, Math.min(x, wrap.width - tw - 12));
+  y = Math.max(12, Math.min(y, wrap.height - th - 12));
   tip.style.left = x + 'px';
   tip.style.top = y + 'px';
 }
@@ -1046,6 +1064,14 @@ function bind() {
     $$('#web-filters .chip').forEach(function (c) { c.classList.toggle('is-on', c === btn); });
     counts();
     syncWeb();
+  });
+
+  /* 手机上的提示卡自己可以点开：卡片比露珠大得多，手指好按。
+     桌面不需要（悬停已经有卡，点一下就是翻开），而且它是 pointer-events:none。 */
+  $('#web-tip').addEventListener('click', function () {
+    if (!state.tipWish) return;
+    if (!(state.web && state.web.touchId)) return;
+    openScreening(state.tipWish);
   });
 
   $('#screening-close').addEventListener('click', closeScreening);

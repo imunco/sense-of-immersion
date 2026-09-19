@@ -1,5 +1,12 @@
 /* 蛛网 —— 一张真正的圆网，露珠是愿望 */
 const MOODS = ['silk', 'abyss', 'moon', 'dusk'];
+/* 命中半径（CSS px）。鼠标有 hover，点到就算；手指粗得多，命中的圆得给足。
+   44px 是可点面积的下限，这里给到 60px —— 反正取的是最近的一颗，
+   给大只会让「点在两颗中间」也选中，不会把更远的那颗抢过来。 */
+const R_MOUSE = 22;
+const R_TOUCH = 30;
+const TAP_MOVE = 12;   /* 位移超过这么多就是拖动/滚动，不是「点」 */
+const TAP_HOLD = 700;  /* 按住超过这么久是停下来看，不是「点」 */
 const COLOR = {
   silk:  [233, 150, 122],
   abyss: [104, 176, 186],
@@ -92,6 +99,8 @@ export class SilkWeb {
     MOODS.forEach((m) => { this.sprites[m] = beadSprite(COLOR[m]); });
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.hover = null;
+    this.touchId = '';   /* 手机上「现在摊开着谁」——没有 hover，得自己记住 */
+    this.down = null;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.running = false;
     this.t = 0;
@@ -101,36 +110,94 @@ export class SilkWeb {
     this.resize();
   }
 
+  /* 画布坐标。手指给的 clientX/Y 要减掉画布的位置。 */
+  local(e) {
+    const r = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
   bind() {
+    /* 手指没有 hover：pointermove 在手机上只意味着拖动或滚动，不该拿它来选露珠。 */
     this.onMove = (e) => {
-      const r = this.canvas.getBoundingClientRect();
-      this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
-      this.hit();
-      this.armDwell(this.hover ? this.hover.wish : null);
+      if (e.pointerType === 'touch') return;
+      const p = this.local(e);
+      this.apply(this.hitAt(p.x, p.y, R_MOUSE), false);
     };
-    this.onLeave = () => { this.pointer = null; this.hover = null; this.clearDwell(); this.setHover(null); this.draw(); };
-    this.onDown = () => {
-      this.clearDwell();
-      if (this.hover) {
-        const w = this.hover.wish;
-        if (this.handlers.onSelect) this.handlers.onSelect(w);
+    this.onLeave = () => {
+      if (this.touchId) return;   /* 手机上收起卡片靠再点一次，不靠「把手指移开」 */
+      this.apply(null, false);
+    };
+    this.onDown = (e) => {
+      const touch = e.pointerType === 'touch';
+      this.down = { x: e.clientX, y: e.clientY, t: Date.now(), touch: touch, prev: this.touchId || '' };
+      if (!touch) {
+        /* 鼠标：指针已经在它上面了，按下就是「翻开」 */
+        this.clearDwell();
+        if (this.hover && this.handlers.onSelect) this.handlers.onSelect(this.hover.wish);
+        return;
+      }
+      /* 手指按下去，先把这一颗亮出来 —— 这就是手机上的「悬停」 */
+      const p = this.local(e);
+      this.apply(this.hitAt(p.x, p.y, R_TOUCH), true);
+    };
+    this.onUp = (e) => {
+      const d = this.down;
+      this.down = null;
+      if (!d || !d.touch) return;
+      const moved = Math.abs(e.clientX - d.x) > TAP_MOVE || Math.abs(e.clientY - d.y) > TAP_MOVE;
+      const held = Date.now() - d.t > TAP_HOLD;
+      if (moved || held) return;               /* 拖动 / 长按：保持现状，不当成「点」 */
+      const p = this.local(e);
+      const found = this.hitAt(p.x, p.y, R_TOUCH);
+      if (!found) { this.apply(null, true); return; }   /* 点空处：收起 */
+      /* 按下去之前这一颗的卡片就开着 → 再点一下是「翻到那张海报」 */
+      if (d.prev && d.prev === found.wish.id && this.handlers.onSelect) this.handlers.onSelect(found.wish);
+    };
+    this.onCancel = () => {
+      const d = this.down;
+      this.down = null;
+      if (!d || !d.touch) return;
+      /* 手势被系统接管（滚动 / 缩放）：回到按下去之前的样子 */
+      if (d.prev) {
+        const b = this.beads.filter((x) => x.wish.id === d.prev)[0];
+        this.apply(b ? { bead: b, pos: b.pos || this.node(b.spoke, b.ring, b.jr, b.ja), wish: b.wish } : null, true);
+      } else {
+        this.apply(null, true);
       }
     };
     this.canvas.addEventListener('pointermove', this.onMove, { passive: true });
     this.canvas.addEventListener('pointerleave', this.onLeave);
     this.canvas.addEventListener('pointerdown', this.onDown);
+    this.canvas.addEventListener('pointerup', this.onUp);
+    this.canvas.addEventListener('pointercancel', this.onCancel);
     this.onResize = () => { this.resize(); };
     window.addEventListener('resize', this.onResize);
   }
 
-  setHover(w) { if (this.handlers.onHover) this.handlers.onHover(w, this.hover ? this.hover.pos : null); }
+  /* 唯一的状态出口：改高亮、通知上层、重画，并管住「停够 1.5 秒才算读过」的计时。
+     touch = true 表示这一下是手指点出来的（卡片要记住、要等第二下才翻开）。 */
+  apply(found, touch) {
+    const prev = this.hover;
+    const changed = (!!found !== !!prev) || (found && prev && found.wish.id !== prev.wish.id);
+    this.hover = found;
+    if (touch) this.touchId = found ? found.wish.id : '';
+    else this.touchId = '';
+    this.canvas.style.cursor = found && !touch ? 'pointer' : 'default';
+    if (changed) {
+      if (this.handlers.onHover) this.handlers.onHover(found ? found.wish : null, found ? found.pos : null, !!touch);
+      this.draw();
+    }
+    this.armDwell(found ? found.wish : null);
+  }
 
   /* 在露珠上停够一会儿，才算读过它。
      一次连续停驻只报一次（手别抖）；离开再回来会重新起算 ——
-     去重交给上层：本机对同一条只记一次，一天又只给出一条。 */
+     去重交给上层：本机对同一条只记一次，一天又只给出一条。
+     手机上「点开来看着它」就是这里的停驻：卡片收起了，计时就作废。 */
   armDwell(wish) {
     const id = wish && wish.id ? wish.id : '';
-    if (!id || this.dwellId === id) return;
+    if (!id) { this.clearDwell(); return; }
+    if (this.dwellId === id) return;
     this.clearDwell();
     this.dwellId = id;
     this.dwellTimer = setTimeout(() => {
@@ -207,19 +274,17 @@ export class SilkWeb {
     this.beads.forEach((b) => { if (b.wish.id === id) b.born = performance.now(); });
   }
 
-  hit() {
-    if (!this.pointer) return;
-    let best = null, bestD = 22 * 22;
+  /* 命中测试：半径里取最近的一颗。用 b.pos（画的时候连「下坠」一起算过了），
+     没有就先算一个 —— 于是点到的位置和看到的位置是同一个。 */
+  hitAt(x, y, radius) {
+    let best = null, bestD = radius * radius;
     this.beads.forEach((b) => {
-      const p = this.node(b.spoke, b.ring, b.jr, b.ja);
-      const dx = p.x - this.pointer.x, dy = p.y - this.pointer.y;
+      const p = b.pos || this.node(b.spoke, b.ring, b.jr, b.ja);
+      const dx = p.x - x, dy = p.y - y;
       const d = dx * dx + dy * dy;
-      if (d < bestD) { bestD = d; best = { bead: b, pos: p, wish: b.wish }; }
+      if (d < bestD) { bestD = d; best = { bead: b, pos: { x: p.x, y: p.y }, wish: b.wish }; }
     });
-    const changed = (!!best !== !!this.hover) || (best && this.hover && best.wish.id !== this.hover.wish.id);
-    this.hover = best;
-    this.canvas.style.cursor = best ? 'pointer' : 'default';
-    if (changed) { this.setHover(best ? best.wish : null); this.draw(); }
+    return best;
   }
 
   draw() {
@@ -346,6 +411,8 @@ export class SilkWeb {
     this.canvas.removeEventListener('pointermove', this.onMove);
     this.canvas.removeEventListener('pointerleave', this.onLeave);
     this.canvas.removeEventListener('pointerdown', this.onDown);
+    this.canvas.removeEventListener('pointerup', this.onUp);
+    this.canvas.removeEventListener('pointercancel', this.onCancel);
     window.removeEventListener('resize', this.onResize);
   }
 }

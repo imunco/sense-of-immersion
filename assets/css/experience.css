@@ -498,6 +498,15 @@
   transition: opacity var(--dur-2) var(--ease-out-quart), transform var(--dur-2) var(--ease-out-quart);
 }
 .web-tip.is-on { opacity: 1; transform: none; }
+/* 手机上：卡片自己可以被点（翻到那张海报），所以它得吃事件；也给它一个高度上限，
+   免得一句长愿望把整屏铺满。桌面保持 pointer-events:none —— 那里点一下就是翻开。 */
+.web-tip.is-touch {
+  pointer-events: auto;
+  cursor: pointer;
+  max-height: min(52svh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .web-tip__name { font-family: var(--font-credit); font-size: var(--t-micro); letter-spacing: 0.32em; color: var(--thread); margin-bottom: 0.5em; }
 .web-tip__wish { font-family: var(--font-cjk); font-weight: 500; font-size: var(--t-base); line-height: 1.8; letter-spacing: 0.05em; color: var(--ink); }
 .web-tip__meta { margin-top: 0.7em; font-size: var(--t-micro); letter-spacing: 0.16em; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
@@ -805,6 +814,14 @@
   color: var(--thread);
 }
 .web-tip__silk.is-loose { color: var(--ink-faint); }
+/* 只在手机上出现的一行：这张卡可以点开（桌面上一点就是翻开，不需要它） */
+.web-tip__go {
+  margin-top: 0.8em;
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  letter-spacing: 0.16em;
+  color: var(--thread);
+}
 
 /* ---------------------------------------------------------- 关于里的解释 */
 .about dd b { color: var(--ink); font-weight: 700; }

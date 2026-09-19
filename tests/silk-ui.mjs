@@ -442,6 +442,77 @@ const mWords = await page.evaluate(() => (window.__yixian.echo.cloud ? window.__
 ok('手机上回响也能铺开', mWords >= 6, 'words=' + mWords);
 await shot('S15-mobile-echo');
 
+/* ---- 手机 · 真的触摸：蛛网上的露珠点得开吗 ----
+   上面那次手机只是把窗口缩窄（还是鼠标），所以「手指点露珠」这条路一直是死的：
+   命中测试只在 pointermove 里跑，而手指没有 hover。这一段用真的触摸事件走一遍。 */
+await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+await page.goto(BASE + '/#/web', { waitUntil: 'networkidle2' });
+await page.waitForFunction(() => !!(window.__yixian && window.__yixian.web && window.__yixian.web.beads.length), { timeout: 20000 });
+await wait(1200);
+
+const beadTapPoint = (id) => page.evaluate((t) => {
+  const b = window.__yixian.web.beads.filter((x) => x.wish.id === t)[0];
+  if (!b || !b.pos) return null;
+  const r = document.querySelector('#web-canvas').getBoundingClientRect();
+  return { x: r.left + b.pos.x, y: r.top + b.pos.y, top: r.top, left: r.left, w: r.width, h: r.height };
+}, id);
+const tipState = () => page.evaluate(() => {
+  const t = document.querySelector('#web-tip');
+  const r = t.getBoundingClientRect();
+  return { on: t.classList.contains('is-on'), touch: t.classList.contains('is-touch'), bottom: r.bottom, top: r.top, left: r.left, right: r.right, w: r.width, h: r.height };
+});
+const posterOpen = () => page.evaluate(() => !document.querySelector('#screening').hidden);
+
+await page.evaluate(() => { localStorage.removeItem('yixian.reads.v1'); localStorage.removeItem('yixian.readgiven.v1'); });
+const tTouch = 'w_looseOther5';
+const tp = await beadTapPoint(tTouch);
+ok('手机上拿得到露珠的位置', !!tp);
+
+/* 第一下：看一眼（桌面上那一下 hover 的等价物） */
+await page.touchscreen.tap(tp.x, tp.y);
+await wait(450);
+const tip1 = await tipState();
+ok('手指点露珠：提示卡出来了', tip1.on && tip1.touch === true, JSON.stringify({ on: tip1.on, touch: tip1.touch }));
+ok('单点不会直接翻海报（先给一眼）', (await posterOpen()) === false);
+ok('提示卡落在露珠上方，没被自己的手指压住', tip1.bottom <= tp.y - 4, 'bottom=' + Math.round(tip1.bottom) + ' beadY=' + Math.round(tp.y));
+await shot('S16-mobile-peek');
+
+/* 第二下：翻到那张海报 */
+await page.touchscreen.tap(tp.x, tp.y);
+await wait(700);
+ok('再点同一颗：翻到海报', (await posterOpen()) === true);
+await page.click('#screening-close');
+await wait(450);
+
+/* 卡片自己也能点开（卡片比露珠大得多，手指好按） */
+const tip2 = await tipState();
+if (tip2.on) {
+  await page.touchscreen.tap(tip2.left + Math.min(tip2.w / 2, 60), tip2.top + Math.min(20, tip2.h / 2));
+  await wait(600);
+  ok('点提示卡本身也能翻到海报', (await posterOpen()) === true);
+  if (await posterOpen()) { await page.click('#screening-close'); await wait(400); }
+}
+
+/* 点空处收起：画布最上面那条没有露珠 */
+await page.touchscreen.tap(tp.left + tp.w / 2, tp.top + 20);
+await wait(400);
+ok('点空处：提示卡收起', (await tipState()).on === false);
+
+/* 手机上的「停够 1.5 秒」＝ 点开来看着它。
+   要清的不只是 localStorage：内存里那份 ledger 也是页面加载时读进来的，
+   上面桌面那一段已经读过 w_twoReads002 了，所以这里重新加载一次。 */
+await page.evaluate(() => { localStorage.removeItem('yixian.reads.v1'); localStorage.removeItem('yixian.readgiven.v1'); });
+await page.reload({ waitUntil: 'networkidle2' });
+await page.waitForFunction(() => !!(window.__yixian && window.__yixian.web && window.__yixian.web.beads.length), { timeout: 20000 });
+await wait(900);
+const tp3 = await beadTapPoint('w_twoReads002');
+await page.touchscreen.tap(tp3.x, tp3.y);
+await wait(1900);
+const readOnPhone = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('yixian.reads.v1') || '{"done":{}}').done));
+ok('手机上停够 1.5 秒：这一票记下了', readOnPhone.indexOf('w_twoReads002') >= 0, JSON.stringify(readOnPhone));
+const tip3 = await tipState();
+ok('被读之后提示卡还是手机形态（没掉回桌面那套）', tip3.on && tip3.touch === true);
+
 /* ---- 放映室：远程删除 ---- */
 const pass = (await readFile(resolve(ROOT, '.dsh-passphrase.local'), 'utf8').catch(() => '')).trim();
 if (pass) {
