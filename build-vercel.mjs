@@ -22,5 +22,14 @@ for (const item of ITEMS) {
   await cp(src, resolve(OUT, item), { recursive: true });
   copied.push(item);
 }
+/* data/private/ 整体是**公开可取**的 —— 放映室在浏览器里解密，所以那里只能是
+   公钥（passkey.json）和密文（keys/meta/vault/verifier）。
+   但 ratelimit.json 是采集器自己的**服务端状态**：设备哈希、来源代号、哪天哪条被读过、
+   删除指令的 nonce —— 浏览器一行都不读它。之前它跟着 data/ 一起被发到线上，
+   等于把「地址的当天代号」和阅读时刻公开了，这超出了我们对外承诺的范围，所以从产物里删掉。
+   （本地 scripts/serve.mjs 是直接读仓库的，不受影响。） */
+const serverOnly = resolve(OUT, 'data/private/ratelimit.json');
+if (existsSync(serverOnly)) { await rm(serverOnly, { force: true }); console.log('已从产物里移除: data/private/ratelimit.json'); }
+
 await writeFile(resolve(OUT, '.nojekyll'), '');
 console.log('已输出到 public/: ' + copied.join(', '));

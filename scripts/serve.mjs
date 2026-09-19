@@ -35,7 +35,7 @@ const SECURITY = {
     "script-src 'self'",
     /* 中文字体按设计要试三个 CDN，所以样式与字体来源里必须放行它们 */
     "style-src 'self' https://fonts.googleapis.com https://fonts.loli.net https://fonts.geekzu.org",
-    "font-src 'self' data: https://fonts.gstatic.com https://fonts.loli.net https://fonts.geekzu.org",
+    "font-src 'self' data: https://fonts.gstatic.com https://gstatic.loli.net https://fonts.geekzu.org",
     "img-src 'self' data:",
     "connect-src 'self' https://ntfy.sh https://*.ntfy.sh",
     "object-src 'none'",

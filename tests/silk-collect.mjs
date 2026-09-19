@@ -44,6 +44,13 @@ const passphrase = (await readFile(resolve(ROOT, '.dsh-passphrase.local'), 'utf8
 const dir = await mkdtemp(join(tmpdir(), 'yixian-silk-'));
 for (const item of ['scripts', 'shared', 'data', 'lib']) await cp(resolve(ROOT, item), resolve(dir, item), { recursive: true });
 
+/* 这个回归管的是「被读 / 续丝 / 远程删除 / 冷却」这几层，不管通行密钥那一层。
+   但 data/ 是整份拷过来的 —— 一旦本机登记过通行密钥（data/private/passkey.json
+   里有了 publicJwk），采集器就会要求删除指令带硬件签名，这里那条没签名的删除
+   会被（正确地）拒掉，于是下面几条断言全部假红。
+   所以在这里明确清掉：通行密钥那一层由 tests/webauthn.test.mjs 专门验。 */
+await writeFile(resolve(dir, 'data/private/passkey.json'), JSON.stringify({ installed: false }, null, 2) + '\n');
+
 const cfg = await readJSON(resolve(dir, 'data/config.json'), {});
 const salt = (cfg.crypto && cfg.crypto.salt) || '';
 const dh = (v) => sha256Hex('k:' + String(v) + ':' + salt).slice(0, 24);

@@ -79,6 +79,11 @@ page.on('request', (req) => {
   if (url.indexOf('/data/reads.json') >= 0) { req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(reads) }); return; }
   if (url.indexOf('/data/wishes.jsonl') >= 0) { req.respond({ status: 200, contentType: 'application/x-ndjson', body: '' }); return; }
   if (url.indexOf('/data/blocked.json') >= 0) { req.respond({ status: 200, contentType: 'application/json', body: '[]' }); return; }
+  /* 通行密钥那层单独由 tests/passkey-e2e.mjs 验（它带 Chrome 的虚拟认证器）。
+     这里如果放着仓库里那把**真的**钥匙不管，放映室会停在第二因素上，
+     下面整段远程删除的断言就全进不去了 —— 所以在这一层谎报「没装」，
+     让这个回归专心管它自己的事。 */
+  if (url.indexOf('/data/private/passkey.json') >= 0) { req.respond({ status: 200, contentType: 'application/json', body: '{"installed":false}' }); return; }
   req.continue();
 });
 

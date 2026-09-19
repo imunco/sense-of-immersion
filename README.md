@@ -119,20 +119,32 @@ npx vercel --prod                                                               
 Vercel 那边没有这个变量时，函数只是原样转发、不签名；采集器也就不认签名——
 **fail closed**，宁可少记，不可假记。
 
+> ⚠️ **顺序不能反：先 Vercel，再 GitHub。** 反过来的那段时间里，采集器要求签名而函数签不出来，
+> 读会**完全不计数**（fail closed 的代价）。改完用 `/api/health` 看 `readSigned` 是不是 `true`。
+
 ### 顺手把函数也接到带存储的限流上（可选）
 
 无状态函数自己数不了数，所以「每 IP 几次」必须有外部存储。代码按 Vercel KV / Upstash 的
-REST 接口写好了（`lib/kv.js`，纯 HTTP，不引任何 npm 包）：
+REST 接口写好了（`lib/kv.js`，纯 HTTP，**不引任何 npm 包**）。一条命令就能接上：
 
 ```bash
-npx vercel env add KV_REST_API_URL production        # 接一个 KV / Upstash 就有
-npx vercel env add KV_REST_API_TOKEN production
-npx vercel --prod
+npx vercel integration add upstash/upstash-kv --plan free     # 会弹一次条款确认
+# 接上后项目里自动多出 KV_REST_API_URL / KV_REST_API_TOKEN（还有 KV_URL / REDIS_URL）
 ```
+
+也可以自己接别的 Upstash（或 Vercel KV），手动加那两个变量即可；
+变量名认 `KV_REST_API_*` 和 `UPSTASH_REDIS_REST_*` 两套。
 
 配了之后：`/api/poke` 每来源地址 5 分钟 6 次，`/api/read` 一小时 40 次。
 没配就放行、响应里标明；KV 连不上也放行（限流失败不挡正常用户）。
-写进 KV 的是「地址的当天代号」，不是地址本身。
+写进 KV 的是「**地址的当天代号**」，不是地址本身。
+
+验证（真实那台，不是假服务器；没配就自动跳过）：
+
+```bash
+node tests/kv-live.mjs     # 计数 1/2/3、超限拦住、EXPIRE 真的设上 TTL、键里没有地址
+curl -s https://<你的域名>/api/health   # hasKv 应该是 true
+```
 
 ---
 
@@ -353,7 +365,10 @@ node tests/pentest-server.mjs   # 服务端渗透：/api/read 与采集器
 node tests/readid.test.mjs      # 读的唯一化：签名、防伪造、fail closed
 node tests/passkey-e2e.mjs      # 通行密钥全链路（Chrome 虚拟认证器真跑一遍）
 node tests/webauthn.test.mjs    # 断言校验的正反例 + 采集器拒收无签名删除
-node tests/kv.test.mjs          # 带存储的限流（假 Upstash）
+node tests/kv.test.mjs          # 带存储的限流（假 Upstash，任何机器都能跑）
+node tests/kv-live.mjs          # 对着**真的**那台 Upstash 跑一遍（没配就自动跳过）
+node tests/silk-collect.mjs     # 被读 / 续丝 / 远程删除 / 冷却（采集器侧）
+node tests/envelope.test.mjs    # 元数据信封往返（要本机口令文件）
 node scripts/fetch-fonts.mjs    # 重新下载自托管拉丁字体
 node scripts/collect.mjs        # 手动跑一次采集
 node tests/shots.mjs            # 用 Chrome 走一遍全流程并截图到 tests/shots/

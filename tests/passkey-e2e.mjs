@@ -172,8 +172,13 @@ try {
   if (browser) await browser.close();
 }
 
-const restored = JSON.parse(await readFile(PASSKEY, 'utf8'));
-ok('跑完把 passkey.json 还原成占位了（没有把 localhost 的钥匙留在仓库里）', restored.installed === false && !restored.publicJwk);
+/* 跑完必须**原样**还回去。注意不能断言"还成了占位"：
+   仓库里可能本来就装着一把真钥匙（线上登记的那把），那才是要还回去的东西。 */
+const restoredRaw = await readFile(PASSKEY, 'utf8');
+const restored = JSON.parse(restoredRaw);
+ok('跑完把 passkey.json 原样还原了（没有把 localhost 的钥匙留在仓库里）',
+  restoredRaw === backup && JSON.stringify(restored) === JSON.stringify(JSON.parse(backup)),
+  'rpId=' + (restored.rpId || '(占位)'));
 
 console.log(fails ? '\n' + fails + ' 项未通过' : '\n全部通过');
 process.exitCode = fails ? 1 : 0;

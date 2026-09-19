@@ -10,8 +10,24 @@
 | 触发端点 | https://yixian-archive.vercel.app/api/poke |
 | 被读端点 | https://yixian-archive.vercel.app/api/read |
 | Vercel 项目 | `xcdh520-githubs-projects/yixian-archive` |
-| 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS`、`WISH_READ_SECRET` |
+| 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS`、`WISH_READ_SECRET`、`KV_REST_API_URL`、`KV_REST_API_TOKEN`（最后两个由 Upstash 集成注入） |
+| GitHub Secrets | `WISH_ADMIN_PASSPHRASE`、`WISH_READ_SECRET`（**必须与 Vercel 同一个值**） |
+| 带存储的限流 | Upstash for Redis（免费版，主区东京 `hnd1`），资源名 `yixian-rate` |
+| 放映室第二因素 | 通行密钥已登记（`data/private/passkey.json` 的 rpId 是线上域名） |
 | GitHub Pages | **已停用** |
+
+### 别只看这份文档，三行命令核实
+
+```bash
+curl -s https://yixian-archive.vercel.app/api/health
+# → {"ok":true,…,"hasKv":true,"readSigned":true}
+gh secret list --repo imunco/sense-of-immersion     # 应能看到 WISH_READ_SECRET
+node tests/kv-live.mjs                              # 对着真的那台 Upstash 跑一遍限流
+```
+
+`hasKv` / `readSigned` 是后加的字段。这两个恰好是最容易「以为配好了、其实没配」的地方
+——**本文档上一版就在这里写错过一次**：把当时并没配的 `WISH_READ_SECRET` 写成了已配。
+所以现在让函数自己如实报出来，而不是靠文档自证。
 
 ### 站点是怎么输出的
 
@@ -85,7 +101,7 @@ npx vercel env add GITHUB_WORKFLOW production           # collect.yml
 npx vercel --prod
 ```
 
-### 3. 「被读」的唯一化（可选，但不配就等于没有）
+### 3. 「被读」的唯一化（**线上已配好**）
 
 `api/read.js` 靠一个密钥签发 cookie、算来源代号。这个密钥必须**同时**放在
 Vercel 和 GitHub Secrets 里，两边不一样就等于没配：
@@ -100,11 +116,45 @@ npx vercel --prod
 没配时函数只是原样转发、不签名，采集器不认签名过的读 —— 宁可少记，不可假记。
 本地自测可以只设进程变量：`WISH_READ_SECRET=... node tests/readid.test.mjs`。
 
+> ⚠️ **顺序不能反：先 Vercel，再 GitHub。** 反过来的那段窗口里，采集器要求签名而函数签不出来，
+> 读会**完全不计数**（fail closed 的代价：宁可少记，不可假记）。
+
+**当前线上状态：两边都配好了同一个值。** 当时不是"看文档说配了"就算数，而是两路独立验证：
+
+1. 从公开的中转站把线上函数签发的那条读消息抓下来，用**本机那份密钥**验它的 HMAC → `verify=true`
+   （证明 Vercel 存的值与本机文件逐字节相同）；
+2. 故意发一条"签名合法、工作量证明无效"的读，触发线上采集任务，日志里出现 `被读证明无效: 1`
+   —— 这条**只有签名先验过**才可能产生（证明 GitHub 的 Secret 与 Vercel 同值）。
+   两边不一致时它只会落进 `被读未签名`。
+
+### 3b. 带存储的限流（**线上已接**：Upstash for Redis）
+
+无状态函数自己数不了数，所以"每 IP 几次"必须有外部存储。一条命令接上：
+
+```bash
+npx vercel integration add upstash/upstash-kv --plan free      # 会弹一次条款确认（5 分钟内点完）
+```
+
+接上后项目里自动多出 `KV_REST_API_URL`、`KV_REST_API_TOKEN`（另有 `KV_URL`/`REDIS_URL`），
+`lib/kv.js` 读前两个，也认 `UPSTASH_REDIS_REST_*`。
+当前资源名 `yixian-rate`，免费版，主区东京 `hnd1`。
+
+生效后：`/api/poke` 每来源地址 5 分钟 6 次；`/api/read` 一小时 40 次。
+**没配就放行并在响应里标明；KV 连不上也放行** —— 限流失败不该拦住正常用户。
+写进 KV 的是「来源地址的当天代号」`HMAC(密钥, 地址 + 当天)`，**不是地址本身**，换日即失联。
+
+验证：
+
+```bash
+node tests/kv-live.mjs     # 对着真的那台跑：1/2/3 计数、超限拦住、EXPIRE 真的设上 TTL、键里没有地址
+curl -s https://yixian-archive.vercel.app/api/health    # hasKv 应为 true
+```
+
 部署完会得到一个地址，例如 `https://yixian-archive.vercel.app`。验证：
 
 ```bash
 curl -s https://yixian-archive.vercel.app/api/health
-# → {"ok":true,"hasToken":true,...}
+# → {"ok":true,"hasToken":true,"hasKv":true,"readSigned":true,...}
 
 curl -s -X POST https://yixian-archive.vercel.app/api/poke
 # → {"ok":true,"message":"已叫醒采集任务"}
