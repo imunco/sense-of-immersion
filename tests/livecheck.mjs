@@ -6,12 +6,43 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true, args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars'] });
 const page = await browser.newPage();
 const problems = [];
-page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+/* 中文字体按设计要试三个第三方 CDN，不通就退到系统宋体栈 —— 在中国大陆
+   fonts.googleapis.com 基本是不通的，那是**预期**，不是页面缺陷。
+   注意：CSP 挡下字体时候的控制台报错，location 是 assets/js/fonts.js，
+   不是字体主机，所以不会被这个过滤器放过（那道错必须能报出来）。 */
+const networkDown = (t) => t.indexOf('ERR_CONNECTION_CLOSED') >= 0 || t.indexOf('ERR_ABORTED') >= 0 || t.indexOf('ERR_NAME_NOT_RESOLVED') >= 0 || t.indexOf('ERR_CONNECTION_RESET') >= 0;
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  const text = m.text();
+  const where = (m.location && m.location().url) || '';
+  if (/fonts\.(googleapis|loli|geekzu)|gstatic\./.test(where)) return;
+  if (networkDown(text)) return;
+  problems.push('console: ' + text + ' @ ' + where);
+});
 page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-page.on('requestfailed', (r) => problems.push('reqfail: ' + r.url().slice(0, 90) + ' :: ' + ((r.failure() || {}).errorText)));
+page.on('requestfailed', (r) => {
+  const t = (r.failure() || {}).errorText || '';
+  if (networkDown(t)) return;
+  problems.push('reqfail: ' + r.url().slice(0, 90) + ' :: ' + t);
+});
+
+/* 站点在外面，但**本机出网**会偶发 ERR_CONNECTION_CLOSED（代理/沙箱抖动），跟站点无关。
+   一次不通就重试，三次都不通才算问题 —— 否则这个冒烟会假红，久了就没人信它了。 */
+const goto = async (url) => {
+  for (let i = 1; i <= 3; i++) {
+    try { return await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 }); }
+    catch (e) {
+      const msg = String((e && e.message) || e);
+      if (!networkDown(msg)) throw e;
+      if (i === 3) { problems.push('goto: ' + url + ' :: ' + msg.split(' at ')[0]); return null; }
+      console.log('  · 第 ' + i + ' 次打开 ' + url + ' 没通，重试');
+      await wait(2500);
+    }
+  }
+};
 
 await page.setViewport({ width: 1440, height: 900 });
-await page.goto(BASE + '/', { waitUntil: 'networkidle2', timeout: 90000 });
+await goto(BASE + '/');
 await page.evaluate(() => document.fonts.ready).catch(() => {});
 await page.waitForFunction(() => !!window.__yixian, { timeout: 40000 }).catch(() => {});
 await wait(800);
@@ -34,7 +65,7 @@ console.log('蛛网:', JSON.stringify(await page.evaluate(() => ({
 
 /* 放映室：线上已经装了通行密钥，所以口令之后**应该**停在第二因素上。
    这里不替用户按指纹（自动化点不了 Windows Hello），只确认那道门真的在挡。 */
-await page.goto(BASE + '/admin.html', { waitUntil: 'networkidle2' });
+await goto(BASE + '/admin.html');
 await wait(1200);
 await page.type('#gate-pass', (process.env.WISH_ADMIN_PASSPHRASE || ''), { delay: 25 });
 await page.click('#gate-form button[type=submit]');
