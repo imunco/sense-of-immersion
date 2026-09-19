@@ -33,10 +33,16 @@ export function config() { return cfg; }
 
 export async function loadConfig() {
   try {
-    const r = await fetch('data/config.json', { cache: 'no-cache' });
+    const r = await fetch('data/config.json', { cache: 'no-cache', signal: deadline(12000) });
     if (r.ok) cfg = Object.assign(cfg, await r.json());
   } catch (e) { /* 离线：用 FALLBACK */ }
   return cfg;
+}
+
+/* 第三方（中转站）慢或者干脆不返回时，不能让整页停在那里等 —— 对外请求都带超时。
+   AbortSignal.timeout 老浏览器上没有，拿不到就不带（退化成原来的行为）。 */
+function deadline(ms) {
+  try { return AbortSignal.timeout(ms); } catch (e) { return undefined; }
 }
 
 function endpoint() { return (cfg.endpoint || FALLBACK.endpoint).replace(/\/+$/, ''); }
@@ -144,7 +150,8 @@ export async function flushReads() {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ids: batch, env: env, pow: proof.pow })
+      body: JSON.stringify({ ids: batch, env: env, pow: proof.pow }),
+      signal: deadline(15000)
     });
     ok = r.ok;
   } catch (e) { ok = false; }
@@ -216,7 +223,7 @@ export function pending() { return read(K.pending, []); }
 /* 私密愿望在 vault.jsonl 里只暴露 id，客户端可以借此确认它到底归档了没有 */
 export async function loadVaultIds() {
   try {
-    const r = await fetch('data/private/vault.jsonl', { cache: 'no-cache' });
+    const r = await fetch('data/private/vault.jsonl', { cache: 'no-cache', signal: deadline(12000) });
     if (!r.ok) return [];
     const text = await r.text();
     const out = [];
@@ -250,7 +257,7 @@ export async function pokeArchive(force) {
     sessionStorage.setItem(POKE_COUNT, String(n + 1));
   } catch (e) {}
   try {
-    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: deadline(12000) });
     return r.ok;
   } catch (e) { return false; }
 }
@@ -259,7 +266,7 @@ export async function pokeArchive(force) {
    客户端认出它们之后就不会再无休止地重投。 */
 export async function loadQueueIds() {
   try {
-    const r = await fetch('data/queue.jsonl', { cache: 'no-cache' });
+    const r = await fetch('data/queue.jsonl', { cache: 'no-cache', signal: deadline(12000) });
     if (!r.ok) return [];
     const text = await r.text();
     const out = [];
@@ -347,7 +354,7 @@ let archiveCache = null;
 export async function loadArchive(force) {
   if (archiveCache && !force) return archiveCache;
   try {
-    const r = await fetch('data/wishes.jsonl', { cache: 'no-cache' });
+    const r = await fetch('data/wishes.jsonl', { cache: 'no-cache', signal: deadline(12000) });
     if (!r.ok) throw new Error('archive ' + r.status);
     const text = await r.text();
     const out = [];
@@ -369,7 +376,7 @@ let blockedCache = null;
 export async function loadBlocked() {
   if (blockedCache) return blockedCache;
   try {
-    const r = await fetch('data/blocked.json', { cache: 'no-cache' });
+    const r = await fetch('data/blocked.json', { cache: 'no-cache', signal: deadline(12000) });
     blockedCache = r.ok ? await r.json() : [];
     if (!Array.isArray(blockedCache)) blockedCache = [];
   } catch (e) { blockedCache = blockedCache || []; }
@@ -386,7 +393,7 @@ export async function loadReads() {
   if (readsCache) return readsCache;
   readsCache = { reads: {}, mends: {}, updated: null };
   try {
-    const r = await fetch('data/reads.json', { cache: 'no-cache' });
+    const r = await fetch('data/reads.json', { cache: 'no-cache', signal: deadline(12000) });
     if (r.ok) {
       const d = await r.json();
       readsCache = {
@@ -408,7 +415,7 @@ export async function loadModeration() {
   if (moderationCache) return moderationCache;
   moderationCache = { limits: { nameMax: 24, wishMax: 160, wishMin: 2, maxLinks: 0, maxRepeatRun: 8 }, bannedWords: [] };
   try {
-    const r = await fetch('data/moderation.json', { cache: 'no-cache' });
+    const r = await fetch('data/moderation.json', { cache: 'no-cache', signal: deadline(12000) });
     if (r.ok) {
       const m = await r.json();
       moderationCache = Object.assign(moderationCache, m);
@@ -470,7 +477,8 @@ export async function publish(payload) {
   const r = await fetch(endpoint() + '/' + encodeURIComponent(cfg.topic), {
     method: 'POST',
     body: JSON.stringify(payload),
-    headers: { 'content-type': 'text/plain;charset=utf-8' }
+    headers: { 'content-type': 'text/plain;charset=utf-8' },
+    signal: deadline(15000)
   });
   if (!r.ok) throw new Error('relay ' + r.status);
   return r.json();
@@ -479,7 +487,7 @@ export async function publish(payload) {
 /* 拉取中转站上最近的愿望。since 为 unix 秒，'all' 表示缓存内的全部。 */
 export async function poll(since) {
   const url = relay() + '?poll=1&since=' + encodeURIComponent(since == null ? 'all' : since);
-  const r = await fetch(url, { cache: 'no-store' });
+  const r = await fetch(url, { cache: 'no-store', signal: deadline(15000) });
   if (!r.ok) throw new Error('poll ' + r.status);
   const text = await r.text();
   const out = [];
