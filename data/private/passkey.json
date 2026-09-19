@@ -1,7 +1,16 @@
 {
-  "installed": false,
-  "_note": "放映室的通行密钥。没装的时候就是这个占位（里面没有公钥，什么都不会触发）。装法：进放映室，点右上角「登记通行密钥」，把下载到的 passkey.json 覆盖到这里再推送。装好之后，进放映室和远程删除都需要这把钥匙的签名 —— 只有口令的人发不出删除。",
-  "_why": "TOTP（验证器里那种 6 位码）在这个架构里是表演：密钥存公开仓库谁都能算码，被口令加密后存仓库则用口令就能解开。通行密钥的私钥在硬件里，挡得住拿到口令的人。",
-  "_reset": "钥匙丢了/换电脑：把这个文件改回 installed:false 或删掉，提交推送，就回到纯口令模式。",
-  "_domain": "2026-09-19 换域名到 uncodeapps.icu（原来那把钥匙登记在 yixian-archive.vercel.app 上，rpId 不匹配就用不了；旧记录在 git 里：git show 2a8dd02:data/private/passkey.json）。在浏览器里对**新域名**重新登记一次即可。"
+  "v": 1,
+  "rpId": "uncodeapps.icu",
+  "origin": "https://uncodeapps.icu",
+  "credentialId": "oQUoGGhAWIynEx7RngR-NQ",
+  "publicJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "1sg8UzosqrYmEj-vxxn3WB9yfpzVoUo63Dksh96poIA",
+    "y": "SfVSmfu8dsWC4O_A-SEXMNsjPd3kaXZlARzl0H62eFA",
+    "ext": false
+  },
+  "alg": -7,
+  "label": "放映室 uncodeapps.icu",
+  "addedAt": "2026-09-19T16:16:22.679Z"
 }
