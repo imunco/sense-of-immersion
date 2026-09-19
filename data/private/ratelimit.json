@@ -2,5 +2,11 @@
   "devices": {},
   "content": {},
   "global": [],
-  "total": 0
+  "total": 0,
+  "wrote": {},
+  "reads": {},
+  "readIps": {},
+  "readGlobal": [],
+  "wishReads": {},
+  "delNonces": []
 }
