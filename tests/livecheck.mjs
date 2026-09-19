@@ -45,7 +45,9 @@ await page.setViewport({ width: 1440, height: 900 });
 await goto(BASE + '/');
 await page.evaluate(() => document.fonts.ready).catch(() => {});
 await page.waitForFunction(() => !!window.__yixian, { timeout: 40000 }).catch(() => {});
-await wait(800);
+/* loadFonts() 是异步的：注入 CSS → 等它回来 → 试用字体，最快也要一两秒才写 dataset.cjk；
+   三个 CDN 都不通时最坏二十几秒才写 'fallback'。所以先等它落定，再判断「是不是压根没调用」。 */
+await page.waitForFunction(() => !!document.documentElement.dataset.cjk, { timeout: 30000 }).catch(() => {});
 console.log('前台:', JSON.stringify(await page.evaluate(() => ({
   cjk: document.documentElement.dataset.cjk,
   heroCount: document.querySelector('#hero-count').textContent,
