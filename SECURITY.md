@@ -297,7 +297,10 @@ NULL 字节、两千字的重复标签……），从**九条路**进去：名�
   直接解开 `data/private/*`。第二因素挡的是"拿着口令就把东西删了/看个遍"，
   挡不住"拿着口令离线解密"。要让数据本身也需要硬件，得用 WebAuthn 的 PRF 扩展把密钥
   也绑在硬件上，那会带来"钥匙丢了数据就永久打不开"的风险，这个站不做。
-  **现状：线上已登记并生效**（`data/private/passkey.json` 的 rpId 是 `yixian-archive.vercel.app`，
+  **现状：2026-09-19 换了域名（`uncodeapps.icu`），需要对新域名重新登记一次** ——
+  rpId 绑域名，旧钥匙（登记在 `yixian-archive.vercel.app`）在新域名上验不过，
+  所以在重新登记之前，放映室回到纯口令模式（`data/private/passkey.json` 是 `installed:false` 占位）。
+  登记好之后会重新变成：
   EC/P-256）——所以现在**进放映室要口令 + 硬件验证，远程删除还要额外一次硬件签名**。
   **钥匙丢了**：把 `data/private/passkey.json` 改回 `installed: false` 提交推送，回到纯口令模式。
   **换设备**：现在一份文件只装一把钥匙（一台设备），再登记会覆盖上一把。

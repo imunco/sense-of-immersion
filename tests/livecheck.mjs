@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-core';
 /* 默认打线上（Vercel）。GitHub Pages 已停用，别再默认打到那儿去。
    也可以传一个参数指到别的实例：node tests/livecheck.mjs http://127.0.0.1:4173 */
-const BASE = process.argv[2] || 'https://yixian-archive.vercel.app';
+const BASE = process.argv[2] || 'https://uncodeapps.icu';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({ executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', headless: true, args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars'] });
 const page = await browser.newPage();

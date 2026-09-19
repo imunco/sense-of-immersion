@@ -4,22 +4,59 @@
 
 | | |
 |---|---|
-| 站点 | https://yixian-archive.vercel.app/ （许愿馆） |
-| 后台 | https://yixian-archive.vercel.app/admin.html （无站内入口） |
-| 健康检查 | https://yixian-archive.vercel.app/api/health |
-| 触发端点 | https://yixian-archive.vercel.app/api/poke |
-| 被读端点 | https://yixian-archive.vercel.app/api/read |
+| 站点 | https://uncodeapps.icu/ （许愿馆） |
+| 后台 | https://uncodeapps.icu/admin.html （无站内入口） |
+| 健康检查 | https://uncodeapps.icu/api/health |
+| 触发端点 | https://uncodeapps.icu/api/poke |
+| 被读端点 | https://uncodeapps.icu/api/read |
 | Vercel 项目 | `xcdh520-githubs-projects/yixian-archive` |
 | 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS`、`WISH_READ_SECRET`、`KV_REST_API_URL`、`KV_REST_API_TOKEN`（最后两个由 Upstash 集成注入） |
 | GitHub Secrets | `WISH_ADMIN_PASSPHRASE`、`WISH_READ_SECRET`（**必须与 Vercel 同一个值**） |
 | 带存储的限流 | Upstash for Redis（免费版，主区东京 `hnd1`），资源名 `yixian-rate` |
-| 放映室第二因素 | 通行密钥已登记（`data/private/passkey.json` 的 rpId 是线上域名） |
+| 放映室第二因素 | 换域名后需要**重新登记**（rpId 绑域名），登记前是纯口令模式 |
+| 域名 | `uncodeapps.icu`（Cloudflare 只做 DNS，**代理必须关**，见下节） |
 | GitHub Pages | **已停用** |
+
+### 为什么换域名，以及 Cloudflare 该怎么设
+
+`*.vercel.app` 在国内是**不通**的，实测：
+
+| 现象 | 数据 |
+|---|---|
+| 国内 DNS 被污染 | 阿里 DNS 解析成 `128.121.243.77`、本机解析成 `122.248.226.57` —— 都不是 Vercel 的 IP |
+| SNI 也被挡 | 把域名硬指到 Vercel 真实 IP，**TLS 握手 0 毫秒被重置** |
+| 但 Vercel 的网络本身是通的 | `vercel.com` 直连 200；边缘 IP `76.76.21.21`/`76.76.21.123`/`66.33.60.35` 全部 TLS 0.3 秒完成 |
+| 中转站没问题 | `ntfy.sh` 直连 200，连接 0.3 秒 |
+
+于是换成一个自己的域名。DNS 只要一条：
+
+```
+A   uncodeapps.icu   →   76.76.21.21      （Cloudflare 里把橙色云点成灰色：仅 DNS）
+```
+
+**为什么必须关掉 Cloudflare 的代理**（同一条命令各打四次，直连 vs 走 CF）：
+
+| | 第 1 次 | 第 2 次 | 第 3 次 | 第 4 次 |
+|---|---|---|---|---|
+| 走 Cloudflare 代理 | 1.79s | 1.36s | 1.96s | **5.53s** |
+| 直连 Vercel（灰云） | 0.72s | 0.48s | 0.45s | 0.45s |
+
+差五倍，而且走 CF 会抖。CF 那边确认没有缓存（`cf-cache-status: DYNAMIC`），所以不是缓存的锅，就是绕路。
+**留着橙色云当应急预案**：万一哪天 Vercel 的 IP 被墙，把云点回橙色就能立刻恢复（慢一点，但通）。
+
+换域名要一起做的四件事：
+
+1. `ALLOWED_ORIGINS` 加上新域名（同源调用本来也放行，但跨域/代理场景要它）；
+2. **重新登记通行密钥** —— rpId 绑域名，旧钥匙在新的域名上验不过。登记前 `data/private/passkey.json`
+   是 `installed:false` 的占位，所以放映室暂时是纯口令模式，登记完再把它提交回来；
+3. 文档里的地址（本文、README）；
+4. 旧的 `yixian-archive.vercel.app` 仍然挂着，墙外还能用；但它的放映室因为 rpId 不匹配**进不去第二因素**，
+   只能当只读的公开入口。
 
 ### 别只看这份文档，三行命令核实
 
 ```bash
-curl -s https://yixian-archive.vercel.app/api/health
+curl -s https://uncodeapps.icu/api/health
 # → {"ok":true,…,"hasKv":true,"readSigned":true}
 gh secret list --repo imunco/sense-of-immersion     # 应能看到 WISH_READ_SECRET
 node tests/kv-live.mjs                              # 对着真的那台 Upstash 跑一遍限流
@@ -147,16 +184,16 @@ npx vercel integration add upstash/upstash-kv --plan free      # 会弹一次条
 
 ```bash
 node tests/kv-live.mjs     # 对着真的那台跑：1/2/3 计数、超限拦住、EXPIRE 真的设上 TTL、键里没有地址
-curl -s https://yixian-archive.vercel.app/api/health    # hasKv 应为 true
+curl -s https://uncodeapps.icu/api/health    # hasKv 应为 true
 ```
 
-部署完会得到一个地址，例如 `https://yixian-archive.vercel.app`。验证：
+部署完会得到一个地址，例如 `https://uncodeapps.icu`。验证：
 
 ```bash
-curl -s https://yixian-archive.vercel.app/api/health
+curl -s https://uncodeapps.icu/api/health
 # → {"ok":true,"hasToken":true,"hasKv":true,"readSigned":true,...}
 
-curl -s -X POST https://yixian-archive.vercel.app/api/poke
+curl -s -X POST https://uncodeapps.icu/api/poke
 # → {"ok":true,"message":"已叫醒采集任务"}
 ```
 
@@ -280,13 +317,13 @@ npx vercel --prod
 
 ```bash
 # 健康检查：hasToken 必须是 true
-curl -s https://yixian-archive.vercel.app/api/health
+curl -s https://uncodeapps.icu/api/health
 
 # 等 45 秒（触发端点有 45 秒最小间隔，刚跑过会被跳过）
 sleep 45
 
 # 手动触发一次：应返回 {"ok":true,"message":"已叫醒采集任务"}
-curl -s -X POST https://yixian-archive.vercel.app/api/poke
+curl -s -X POST https://uncodeapps.icu/api/poke
 
 # 看有没有真的起一个 workflow_dispatch 运行
 gh run list --repo imunco/sense-of-immersion --workflow collect-wishes --limit 3
@@ -315,7 +352,7 @@ gh run list --repo imunco/sense-of-immersion --workflow collect-wishes --limit 3
 ## 常见问题
 
 **Q：换完之后网页提交愿望，归档慢了怎么办？**
-先看 `curl -s https://yixian-archive.vercel.app/api/health` 里 `hasToken` 是不是 true。
+先看 `curl -s https://uncodeapps.icu/api/health` 里 `hasToken` 是不是 true。
 是 true 还慢，就是 Vercel 那条 45 秒限流在起作用，等下一分钟就好。
 
 **Q：旧的 PAT 删了，已经归档的数据会丢吗？**

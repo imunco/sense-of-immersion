@@ -6,8 +6,8 @@
 然后挂到蛛网上，成为一颗露珠。
 
 **线上地址（全部由 Vercel 一处提供）**
-- 许愿馆 → https://yixian-archive.vercel.app/
-- 放映室（后台）→ https://yixian-archive.vercel.app/admin.html —— **页面上没有入口，只能手输网址**
+- 许愿馆 → https://uncodeapps.icu/
+- 放映室（后台）→ https://uncodeapps.icu/admin.html —— **页面上没有入口，只能手输网址**
 - 归档接口 → `/api/health`（健康检查）、`/api/poke`（触发归档）
 
 > GitHub Pages 已停用。仓库只作为源码与数据的存放地，
@@ -172,7 +172,7 @@ curl -s https://<你的域名>/api/health   # hasKv 应该是 true
 
 ## 后台：放映室
 
-`https://yixian-archive.vercel.app/admin.html` —— **站内没有任何链接指向它，需要手输网址。**
+`https://uncodeapps.icu/admin.html` —— **站内没有任何链接指向它，需要手输网址。**
 
 口令不落盘：仓库里只有 PBKDF2 的盐、迭代次数，以及一段用派生密钥加密的校验块
 （`data/private/verifier.json`）。解锁时浏览器本地跑 25 万次 PBKDF2，
