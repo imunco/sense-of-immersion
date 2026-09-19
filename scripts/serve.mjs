@@ -27,6 +27,28 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json'
 };
 
+/* 与 vercel.json 保持一致的安全响应头 —— 本地跑的就是线上的策略，
+   这样测试能真的挡住内联脚本/样式被引进来。 */
+const SECURITY = {
+  'content-security-policy': [
+    "default-src 'self'",
+    "script-src 'self'",
+    /* 中文字体按设计要试三个 CDN，所以样式与字体来源里必须放行它们 */
+    "style-src 'self' https://fonts.googleapis.com https://fonts.loli.net https://fonts.geekzu.org",
+    "font-src 'self' data: https://fonts.gstatic.com https://fonts.loli.net https://fonts.geekzu.org",
+    "img-src 'self' data:",
+    "connect-src 'self' https://ntfy.sh https://*.ntfy.sh",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'"
+  ].join('; '),
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'x-frame-options': 'DENY',
+  'permissions-policy': 'geolocation=(), microphone=(), camera=()'
+};
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -36,10 +58,10 @@ createServer(async (req, res) => {
     const info = await stat(file);
     if (!info.isFile()) throw new Error('not a file');
     const body = await readFile(file);
-    res.writeHead(200, {
+    res.writeHead(200, Object.assign({
       'content-type': TYPES[extname(file).toLowerCase()] || 'application/octet-stream',
       'cache-control': 'no-store'
-    });
+    }, SECURITY));
     res.end(body);
   } catch (e) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });

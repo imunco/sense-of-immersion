@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { sealForSite, openFromSite } from '../shared/envelope.js';
 import { deriveKey, decryptJSON } from '../shared/crypto.js';
+import { unwrapKeyring } from '../shared/keyring.js';
 const cfg = JSON.parse(await readFile('data/config.json','utf8'));
 const keys = JSON.parse(await readFile('data/private/keys.json','utf8'));
 const key = await deriveKey((process.env.WISH_ADMIN_PASSPHRASE || ''), cfg.crypto.salt, cfg.crypto.iterations);
-const privateJwk = await decryptJSON(key, keys);
+/* keys.json 是「用口令派生的密钥包起来的密钥环」，不是私钥本身 */
+const privateJwk = (await unwrapKeyring(key, keys)).sitePrivateJwk;
 const meta = { tz: 'Asia/Shanghai', lg: 'zh-CN', ua: 'Chrome on Windows', vp: '1440x900', ref: 'direct', dv: 'd_abc123', n: 3, src: 'web' };
 const env = await sealForSite(cfg.siteKey, meta);
 console.log('envelope bytes:', JSON.stringify(env).length);

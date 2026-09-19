@@ -5,12 +5,17 @@
    · 密钥只存在内存里，刷新即失效；闲置 30 分钟自动锁定；连续错 5 次锁 60 秒
    · 所有用户内容一律用 textContent 渲染，从不拼 innerHTML
    · ⚠️ 愿望正文本身是公开的（产品设定），口令保护的是基本信息，不是愿望 */
-import { loadConfig, loadArchive, loadBlocked, poll, merge, config } from './store.js';
-import { deriveKey, decryptJSON } from '../../shared/crypto.js';
+import { loadConfig, loadArchive, loadBlocked, poll, merge, config, publish } from './store.js';
+import { deriveKey, decryptJSON, encryptJSON } from '../../shared/crypto.js';
 import { unwrapKeyring } from '../../shared/keyring.js';
 import { openFromSite } from '../../shared/envelope.js';
 import { THREADS, threadById } from './config.js';
 import { mountPoster, fullDate, speakingTime, relTime } from './poster.js';
+import { wishCode, silkOf } from './silk.js';
+import {
+  supported as passkeySupported, enrollableHost, prove as passkeyProve, enrollAndDownload, loadPlaced,
+  randomChallenge, challengeFor, delChallengeParts
+} from './passkey.js';
 import { loadFonts } from './fonts.js';
 
 const $ = (s) => document.querySelector(s);
@@ -25,8 +30,17 @@ let PRIV = null;      /* 站点私钥，拆中转站上的信封用，只在内�
 
 const state = {
   rows: [], queue: [], filter: 'all', q: '', sort: 'desc', showHidden: false,
-  limit: 300, cursor: 0, liveIds: new Set(), blocked: new Set(), metaOk: 0, metaFail: 0
+  limit: 300, cursor: 0, liveIds: new Set(), blocked: new Set(), metaOk: 0, metaFail: 0,
+  reads: {}, mends: {}, passkey: null
 };
+
+/* 顶栏下面那行提示：远程删除这类异步动作，需要一句回执 */
+function setNotice(text) {
+  const el = $('#proj-notice');
+  if (!el) return;
+  el.textContent = text || '';
+  if (text) setTimeout(function () { if (el.textContent === text) el.textContent = ''; }, 12000);
+}
 
 let lastActive = Date.now();
 ['click', 'keydown', 'pointermove', 'touchstart'].forEach((t) =>
@@ -105,6 +119,17 @@ async function load() {
   state.metaOk = 0; state.metaFail = 0;
   const blocked = await loadBlocked();
   blocked.forEach((id) => state.blocked.add(id));
+
+  state.passkey = await loadPlaced();
+  /* 丝的命数：被读次数与续丝，采集器聚合出来的 */
+  try {
+    const r = await fetch('data/reads.json', { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      state.reads = (d && d.reads) || {};
+      state.mends = (d && d.mends) || {};
+    }
+  } catch (e) { state.reads = {}; state.mends = {}; }
 
   const archive = await loadArchive(true);
   const metas = new Map();
@@ -204,7 +229,7 @@ function renderLedger() {
   line.textContent = '';
   [['总计', rows.length + ' 条'], ['独立设备', devices + ' 台'], ['平均', avg + ' 字'], ['最长', longest + ' 字'],
    ['未归档', liveCount + ' 条'], ['待审', state.queue.length + ' 条'],
-   ['仅自己可见', (state.privateCount || 0) + ' 条'],
+   ['仅自己可见', (state.privateCount || 0) + ' 条'], ['通行密钥', state.passkey ? '已装' : '未装'],
    ['元数据', state.metaOk + ' 条' + (state.metaFail ? '（' + state.metaFail + ' 条解不开）' : '')]
   ].forEach((pair) => {
     const s = document.createElement('span');
@@ -282,6 +307,16 @@ function renderQueue() {
       });
       acts.appendChild(btn);
     });
+    const delQ = document.createElement('button');
+    delQ.className = 'btn btn--quiet btn--danger';
+    delQ.type = 'button';
+    delQ.textContent = '远程屏蔽';
+    armConfirm(delQ, '远程屏蔽', async () => {
+      const ok = await remoteDelete([q.id]);
+      if (ok) setNotice('已送出。约一分钟后，这一条从待审与蛛网上一起消失。');
+      return ok;
+    });
+    acts.appendChild(delQ);
     row.appendChild(head); row.appendChild(body); row.appendChild(why); row.appendChild(acts);
     host.appendChild(row);
   });
@@ -398,6 +433,69 @@ function tag(text) {
   return s;
 }
 
+/* ---------------------------------------------------------- 远程删除
+   口令不出浏览器：用本机解出来的 KEK 把「要删哪些 id」封成一段密文，
+   投到同一个中转站。只有拿得到口令的采集器能拆开它，拆开才执行删除。
+   写进 blocked.json 之后对所有人生效；延迟约一分钟（等采集器跑一次）。 */
+async function remoteDelete(ids) {
+  if (!KEY || !ids || !ids.length) return false;
+  const at = Date.now();
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const nonce = Array.prototype.map.call(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  /* 装了通行密钥：先让硬件在这一条指令上签个名。
+     挑战绑的是「删哪些 id + nonce + 时刻」，采集器那边会用同一个挑战验。 */
+  let assert = null;
+  if (state.passkey) {
+    try {
+      const challenge = await challengeFor(delChallengeParts(ids, nonce, at));
+      assert = await passkeyProve(state.passkey, challenge);
+    } catch (e) {
+      setNotice((e && e.message) || '通行密钥没有通过，这条删除没有发出去。');
+      return false;
+    }
+  }
+  try {
+    const order = { ids: ids, at: at, nonce: nonce };
+    if (assert) order.assert = assert;
+    const seal = await encryptJSON(KEY, order);
+    await publish({ t: 'del', seal: seal });
+  } catch (e) { return false; }
+  ids.forEach((id) => state.blocked.add(id));
+  state.rows = state.rows.filter((row) => ids.indexOf(row.id) < 0);
+  state.queue = state.queue.filter((item) => ids.indexOf(item.id) < 0);
+  ids.forEach((id) => state.liveIds.delete(id));
+  renderAll();
+  try {
+    const url = config().pokeUrl || '/api/poke';
+    fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => {});
+  } catch (e) {}
+  return true;
+}
+
+/* 两下确认，不用弹窗 */
+function armConfirm(btn, label, onConfirm) {
+  let armed = false;
+  let timer = 0;
+  btn.addEventListener('click', async () => {
+    if (!armed) {
+      armed = true;
+      btn.classList.add('is-armed');
+      btn.textContent = '再点一次，确认';
+      clearTimeout(timer);
+      timer = setTimeout(() => { armed = false; btn.classList.remove('is-armed'); btn.textContent = label; }, 5000);
+      return;
+    }
+    clearTimeout(timer);
+    armed = false;
+    btn.classList.remove('is-armed');
+    btn.disabled = true;
+    btn.textContent = '正在送出…';
+    const ok = await onConfirm();
+    if (!ok) { btn.disabled = false; btn.textContent = '没送出去，再试一次'; }
+    return ok;
+  });
+}
+
 /* ---------------------------------------------------------- 抽屉 */
 function openDrawer(r) {
   const host = $('#drawer');
@@ -421,9 +519,13 @@ function openDrawer(r) {
   host.appendChild(wish);
 
   const dl = document.createElement('dl');
+  const silkNow = silkOf(r, state.reads, state.mends);
   const rows = [
     ['署名', r.name],
-    ['编号', r.id],
+    ['短编号', wishCode(r.id)],
+    ['丝的命数', silkNow.name + ' · ' + silkNow.line],
+    ['被读过', (Number(state.reads[r.id]) || 0) + ' 次'],
+    ['记录 ID', r.id],
     ['写下于', fullDate(r.ts) + ' ' + speakingTime(r.ts) + '（' + relTime(r.ts) + '）'],
     ['丝线', threadById(r.mood).name + ' · ' + threadById(r.mood).en],
     ['语言', r.lg || '（未解密）'],
@@ -470,8 +572,32 @@ function openDrawer(r) {
     cmd.textContent = '已复制：' + line;
   });
   actions.appendChild(hide);
+
+  const deletable = /^w_[A-Za-z0-9_]{4,40}$/.test(r.id);
+  if (deletable) {
+    const del = document.createElement('button');
+    del.className = 'btn btn--quiet btn--danger';
+    del.type = 'button';
+    del.textContent = '删除这条（远程）';
+    armConfirm(del, '删除这条（远程）', async () => {
+      const ok = await remoteDelete([r.id]);
+      if (ok) { closeDrawer(); setNotice('删除请求已送出。约一分钟后，它对所有人都不再出现。'); }
+      return ok;
+    });
+    actions.appendChild(del);
+  }
   actions.appendChild(cmd);
   host.appendChild(actions);
+
+  const note = document.createElement('p');
+  note.className = 'drawer__note';
+  note.textContent = deletable
+    ? '「删除这条（远程）」会在中转站上发一条只有放映室口令能拆开的指令：采集器下次跑起来时，把它从归档里删掉、写进屏蔽名单，约一分钟后对所有人生效。口令本身不会离开这个浏览器。'
+      + (state.passkey
+        ? ' 你装了通行密钥，所以这条指令还要你的硬件签个名 —— 只有口令的人发不出删除。'
+        : ' 现在只凭口令就能删。想让它必须插上你的钥匙，用右上角「登记通行密钥」。')
+    : '这条记录没有可用的愿望 ID，只能在本机隐藏。';
+  host.appendChild(note);
 
   host.hidden = false;
   $('#scrim').hidden = false;
@@ -593,6 +719,8 @@ function lockNow(reason) {
 async function boot() {
   loadFonts();
   await loadConfig();
+  /* 钥匙记录在仓库里（只有公钥）；没有它就是纯口令模式 */
+  state.passkey = await loadPlaced();
 
   setInterval(() => {
     if (KEY && Date.now() - lastActive > IDLE_MS) lockNow('闲置超过 30 分钟，已自动锁定。');
@@ -618,6 +746,32 @@ async function boot() {
   tickLock();
   passEl.focus();
 
+  /* 装了通行密钥就多一步：口令对了，还得让硬件签一次 */
+  const second = $('#gate-2fa');
+  const secondGo = $('#gate-2fa-go');
+  const showSecond = function () {
+    form.hidden = true;
+    second.hidden = false;
+    const hint = $('#gate-2fa-hint');
+    if (hint) hint.textContent = '点下面，系统会弹出 Windows Hello 或手机上的通行密钥。';
+    secondGo.focus();
+  };
+  if (secondGo) {
+    secondGo.addEventListener('click', async () => {
+      secondGo.disabled = true;
+      secondGo.textContent = '等待你的钥匙…';
+      try {
+        await passkeyProve(state.passkey, randomChallenge());
+        enter();
+        return;
+      } catch (e) {
+        $('#gate-2fa-err').textContent = (e && e.message) || '这把钥匙没有通过。';
+        secondGo.disabled = false;
+        secondGo.textContent = '再试一次';
+      }
+    });
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (lockedFor() > 0) return;
@@ -625,7 +779,12 @@ async function boot() {
     btn.textContent = '正在校验…';
     const res = await unlock(passEl.value);
     passEl.value = '';
-    if (res.ok) { clearLock(); enter(); return; }
+    if (res.ok) {
+      clearLock();
+      if (state.passkey) { showSecond(); return; }
+      enter();
+      return;
+    }
     const s = failed();
     errEl.textContent = res.msg + ((s.until || 0) > Date.now() ? ' 连续错太多次，锁 60 秒。' : '');
     btn.disabled = false;
@@ -638,6 +797,16 @@ $('#refresh') && $('#refresh').addEventListener('click', async () => { await loa
 $('#export-csv') && $('#export-csv').addEventListener('click', exportCsv);
 $('#export-json') && $('#export-json').addEventListener('click', exportJson);
 $('#sign-out') && $('#sign-out').addEventListener('click', () => lockNow(null));
+$('#enroll-passkey') && $('#enroll-passkey').addEventListener('click', async () => {
+  if (!passkeySupported()) { setNotice('这个浏览器或这台设备不支持通行密钥。'); return; }
+  if (!enrollableHost()) { setNotice('通行密钥不能在 IP 地址上登记 —— 用域名打开放映室再登记。'); return; }
+  try {
+    await enrollAndDownload('放映室 ' + location.hostname);
+    setNotice('公钥已下载。把它放到 data/private/passkey.json 并推送 —— 之后进放映室和远程删除都要这把钥匙。');
+  } catch (e) {
+    setNotice((e && e.message) || '登记没有完成。');
+  }
+});
 $('#q') && $('#q').addEventListener('input', (e) => { state.q = e.target.value.trim(); state.limit = 300; renderTable(); });
 $('#range-chips') && $('#range-chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip'); if (!b) return;

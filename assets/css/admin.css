@@ -268,6 +268,40 @@
 .queue__wish b { font-weight: 700; margin-right: 0.2em; }
 .queue__why { font-family: var(--font-cjk); font-size: var(--t-xs); letter-spacing: 0.06em; color: var(--dusk); }
 .queue__acts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: 0.2em; }
+
+/* ---------------------------------------------------------- 远程删除 */
+.btn--danger {
+  color: var(--dusk);
+  border-color: color-mix(in oklab, var(--dusk) 42%, transparent);
+}
+.btn--danger:hover, .btn--danger:focus-visible {
+  border-color: var(--dusk);
+  background: color-mix(in oklab, var(--dusk) 12%, transparent);
+  color: var(--dusk);
+}
+.btn--danger.is-armed {
+  border-color: var(--dusk);
+  background: color-mix(in oklab, var(--dusk) 18%, transparent);
+  color: var(--dusk);
+}
+.btn--danger[disabled] { opacity: 0.5; pointer-events: none; }
+.drawer__note {
+  max-width: 44ch;
+  font-family: var(--font-ui);
+  font-size: var(--t-micro);
+  line-height: 1.85;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+.proj-notice {
+  font-family: var(--font-cjk);
+  font-size: var(--t-sm);
+  letter-spacing: 0.08em;
+  color: var(--thread);
+  padding: 0 0 var(--s-2);
+}
+.proj-notice:empty { display: none; }
+
 .tag-priv {
   border-color: color-mix(in oklab, var(--dusk) 48%, transparent);
   color: var(--dusk);

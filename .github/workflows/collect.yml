@@ -29,6 +29,8 @@ jobs:
       - name: 从中转站拉取新的愿望（校验 / 审查 / 限流 / 加密）
         env:
           WISH_ADMIN_PASSPHRASE: ${{ secrets.WISH_ADMIN_PASSPHRASE }}
+          # 被读计数要验签；没有这个 Secret 时采集器不认签过名的读（宁可少记，不可假记）
+          WISH_READ_SECRET: ${{ secrets.WISH_READ_SECRET }}
         run: node scripts/collect.mjs
 
       - name: 归档并提交

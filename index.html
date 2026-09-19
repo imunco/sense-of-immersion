@@ -27,6 +27,8 @@
   <a class="mark" href="#/">一线千愿<span class="mark__en">ONE THREAD</span></a>
   <nav class="masthead__nav" aria-label="主导航">
     <a href="#/web">蛛网</a>
+    <a href="#/echoes">回响</a>
+    <a href="#/web" id="nav-find">查编号</a>
     <a href="#/about">关于</a>
     <span class="masthead__live">今夜 <b id="live-count">—</b> 个愿望</span>
   </nav>
@@ -66,13 +68,20 @@
         <h2 class="act__name" id="cast-title">署名</h2>
         <span class="act__name-en">Cast</span>
       </div>
-      <p class="lede">在第一行，写下你的名字。<br>它会以「CAST」的身份，出现在你的海报上。</p>
-      <label class="field-label" for="name-input">Cast · 你的署名</label>
-      <input id="name-input" class="write write--name" type="text" maxlength="24" placeholder="名字或昵称" autocomplete="nickname" enterkeyhint="next">
-      <p class="cast-credit"><span>CAST</span><b id="cast-preview">—</b></p>
-      <div class="steps">
-        <button class="btn btn--thread" id="to-wish" type="button" disabled>下一步 · 许愿</button>
-        <span class="steps__hint">或按 <kbd>Enter</kbd> 继续</span>
+      <div class="cast-body">
+        <p class="lede">在第一行，写下你的名字。<br>它会以「CAST」的身份，出现在你的海报上。</p>
+        <label class="field-label" for="name-input">Cast · 你的署名</label>
+        <input id="name-input" class="write write--name" type="text" maxlength="24" placeholder="名字或昵称" autocomplete="nickname" enterkeyhint="next">
+        <p class="cast-credit"><span>CAST</span><b id="cast-preview">—</b></p>
+        <div class="steps">
+          <button class="btn btn--thread" id="to-wish" type="button" disabled>下一步 · 许愿</button>
+          <span class="steps__hint">或按 <kbd>Enter</kbd> 继续</span>
+        </div>
+      </div>
+      <div class="cool" id="cast-cool" hidden role="status" aria-live="polite">
+        <p class="cool__line">这一句，已经写下。</p>
+        <p class="cool__left">丝要时间才落定。还有 <b id="cast-cool-left">—</b>，才能再写下一句。</p>
+        <p class="cool__hint">在那之前，去<a class="link-underline" href="#/web">蛛网</a>上看看别人留下的，或者听听<a class="link-underline" href="#/echoes">回响</a>。</p>
       </div>
     </div>
   </section>
@@ -86,6 +95,11 @@
     </div>
     <div class="wish-grid">
       <div class="wish-form">
+        <div class="cool" id="wish-cool" hidden role="status" aria-live="polite">
+          <p class="cool__line">这一句，已经写下。</p>
+          <p class="cool__left">丝要时间才落定。还有 <b id="cool-left">—</b>，才能再写下一句。</p>
+          <p class="cool__hint">在那之前，去<a class="link-underline" href="#/web">蛛网</a>上看看别人留下的。</p>
+        </div>
         <p class="lede">现在，向蛛丝许一个愿。<br>不必宏大，一句想被听见的话就够。</p>
         <label class="field-label" for="wish-input">The Wish · 你的愿望</label>
         <textarea id="wish-input" class="write write--wish" maxlength="160" rows="2" placeholder="愿……" enterkeyhint="done"></textarea>
@@ -116,7 +130,7 @@
         </fieldset>
 
         <p class="privacy" id="privacy-note"><b>蛛网是公开的</b>：你的署名和这条愿望，所有人都能在蛛网上读到。<br>
-          除此之外还会记录写下的时间，以及语言、时区、设备、来源这类基础信息——这些在你按下按钮之前就已经加密，传输途中和存储时都只有密文，只有持有后台口令的人才解得开。不收集 IP，不做定位。</p>
+          除此之外还会记录写下的时间，以及语言、时区、设备、来源这类基础信息——这些在你按下按钮之前就已经加密，传输途中和存储时都只有密文，只有持有后台口令的人才解得开。<b>写这条愿望不经过我们的服务器，不看地址，也不做定位。</b>（读别人愿望时的那次计数是另一回事，写在「关于」里。）</p>
         <p class="wish-error" id="wish-error" role="status" aria-live="polite"></p>
         <button class="btn btn--thread" id="submit-wish" type="button" disabled>牵起这条丝</button>
       </div>
@@ -147,10 +161,46 @@
       </div>
       <div class="reveal__poster" id="reveal-poster"></div>
       <div class="reveal__credits" id="reveal-credits"></div>
+      <div class="reveal__code" id="reveal-code">
+        <span class="reveal__code-label">编号</span>
+        <b id="reveal-code-value">—</b>
+      </div>
+      <p class="reveal__code-hint" id="reveal-code-hint">把这个编号留给想让他看见的人。他在蛛网上输入它，就能翻到这一张海报。</p>
+
+      <div class="share" id="reveal-share">
+        <div class="share__side">
+          <p class="share__head">把这一句递出去<span class="share__clock" id="share-clock"></span></p>
+          <div class="share__tabs" id="share-tabs" role="tablist" aria-label="用哪种形式递出去">
+            <button class="chip is-on" data-share="link" type="button">链接</button>
+            <button class="chip" data-share="qr" type="button">二维码</button>
+            <button class="chip" data-share="code" type="button">编号</button>
+          </div>
+        </div>
+        <div class="share__body">
+          <div class="share__pane" id="share-pane-link">
+            <p class="share__value" id="share-link-value">—</p>
+            <button class="btn btn--thread" id="share-copy-link" type="button">复制链接</button>
+          </div>
+          <div class="share__pane" id="share-pane-qr" hidden>
+            <canvas id="share-qr" aria-label="这张海报的二维码"></canvas>
+            <p class="share__hint">手机扫一下，直接翻到这张海报。</p>
+          </div>
+          <div class="share__pane" id="share-pane-code" hidden>
+            <p class="share__value share__value--code" id="share-code-value">—</p>
+            <button class="btn btn--thread" id="share-copy-code" type="button">复制编号</button>
+          </div>
+          <div class="share__rest" id="share-rest" hidden>
+            <p class="share__value">今天已经递过一次了。</p>
+            <p class="share__hint">还有 <b id="share-left">—</b>。够了 —— 剩下的靠人真的读它。</p>
+          </div>
+        </div>
+        <p class="share__note" id="share-note">复制走链接或编号，就算递出去了 —— 一个人一天只递一次。编号一直看得见，念给对方听也算。</p>
+      </div>
+
       <p class="reveal__note" id="reveal-note" hidden>这条愿望<b>没有公开</b>。它被端到端加密，蛛网上不会出现，只有你和放映室能看到。</p>
       <div class="reveal__acts">
-        <button class="btn btn--thread" id="copy-link" type="button">复制我的海报链接</button>
         <a class="btn btn--quiet" href="#/web">去看蛛网</a>
+        <a class="btn btn--quiet" href="#/echoes">听听回响</a>
       </div>
     </div>
   </section>
@@ -164,6 +214,11 @@
     </div>
     <div class="web-hud">
       <p class="web-hud__count">丝上有 <b id="web-count">—</b> 个愿望</p>
+      <form class="find" id="find-form" role="search">
+        <label class="sr" for="find-input">按编号找一条愿望</label>
+        <input class="find__input" id="find-input" type="search" placeholder="七位编号" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button class="btn btn--quiet find__go" type="submit">找</button>
+      </form>
       <div class="chips" id="web-filters" role="group" aria-label="筛选愿望">
         <button class="chip is-on" data-filter="all" type="button">全部</button>
         <button class="chip" data-filter="tonight" type="button">今夜</button>
@@ -171,7 +226,8 @@
         <button class="chip" data-filter="mine" type="button">我写下的</button>
       </div>
     </div>
-    <div class="web-wrap">
+    <p class="web-legend">丝会随着时间和被读的次数改变样子：新结 · 凝露 · 结实 · 丝散。<a class="link-underline" href="#/about">四态怎么算</a> · 全站在说什么：<a class="link-underline" href="#/echoes">回响</a></p>
+    <div class="web-wrap" id="web-wrap">
       <canvas id="web-canvas" role="img" aria-label="挂满愿望的蛛网，点击露珠可以读到愿望"></canvas>
       <div class="web-tip" id="web-tip" aria-hidden="true"></div>
       <div class="web-empty" id="web-empty" hidden>
@@ -180,6 +236,40 @@
       </div>
       <ul class="sr" id="web-list" aria-label="蛛丝上的愿望"></ul>
     </div>
+    <div class="find-out" id="find-out" hidden>
+      <p class="find-note" id="find-note" role="status" aria-live="polite"></p>
+      <p class="find-hint">想按词看全站在说什么，去 <a class="link-underline" href="#/echoes">回响</a>。</p>
+      <p class="find-out__back"><button class="btn btn--quiet" id="find-clear" type="button">回到蛛网</button></p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════ 第六幕 · 回响 ═══════════════════════ -->
+  <section class="act act--echoes" data-view="echoes" aria-labelledby="echoes-title">
+    <div class="act__head">
+      <span class="act__no">Act IV</span>
+      <h2 class="act__name" id="echoes-title">回响</h2>
+      <span class="act__name-en">Echoes</span>
+    </div>
+    <div class="echo-hud">
+      <p class="echo-lede">蛛丝上所有<em>公开</em>的愿望，把词拆开，在这里排成一片。<br>字号越大，说它的人越多。</p>
+      <div class="chips" id="echo-views" role="group" aria-label="呈现方式">
+        <button class="chip is-on" data-echo="cloud" type="button">云</button>
+        <button class="chip" data-echo="list" type="button">列</button>
+      </div>
+    </div>
+    <div class="echo-wrap" id="echo-cloud-wrap">
+      <canvas id="echo-canvas" role="img" aria-label="全站公开愿望里的词，字号越大出现得越多"></canvas>
+      <div class="echo-tip" id="echo-tip" aria-hidden="true"></div>
+      <div class="echo-empty" id="echo-empty" hidden>
+        <p>网上的愿望还太少，回声还没有聚起来。</p>
+        <a class="btn btn--thread" href="#/cast">写下一句</a>
+      </div>
+    </div>
+    <div class="echo-list-wrap" id="echo-list-wrap" hidden>
+      <ol class="echo-list" id="echo-list"></ol>
+    </div>
+    <ul class="sr" id="echo-sr" aria-label="出现最多的词"></ul>
+    <p class="echo-note" id="echo-note"></p>
   </section>
 
   <!-- ═══════════════════════ 关于 ═══════════════════════ -->
@@ -195,6 +285,12 @@
         <dt>怎么玩</dt><dd>署名 → 许愿 → 选一种丝的颜色 → 选给谁看 → 揭幕 → 去蛛网看公开的愿望。</dd>
         <dt>给谁看</dt><dd>每条愿望提交时由你决定：<b>公开</b>（挂上蛛网，所有人读到）或 <b>仅自己可见</b>（端到端加密，蛛网上不会出现）。</dd>
         <dt>会记录什么</dt><dd>署名、愿望内容、时间，以及语言、时区、设备、来源这类基础信息。基础信息一律加密，传输途中和存储时都只有密文。</dd>
+        <dt>编号</dt><dd>每条愿望有一个七位编号，写在揭幕页上。在蛛网上输入编号，就能翻到那一张海报。<b>这里只按编号找，不按词找。</b><b>仅自己可见的愿望是加密的</b>，别人拿编号查不到，只有写下它的那台设备、在「我写下的」里能看见。</dd>
+        <dt>丝的四态</dt><dd>丝会自己变。<b>新结</b>：二十四小时内，丝细、露珠小。<b>凝露</b>：一到七天，丝上多出几缕。<b>结实</b>：七天以上，被读到过<b>三次以上</b>，丝发亮、露珠饱满。<b>丝散</b>：七天以上还没被读够三次，丝断，露珠悬在断丝上微微下坠。它说的是<b>有没有人接住</b>，不是愿望能不能实现。</dd>
+        <dt>被读够才算接住</dt><dd>看一条愿望时多停一会儿，就算一次「被读」。但一个人一天只有一次机会：<b>二十四小时里，你认真读过的那一条得到这一次</b>，别的愿望要等明天；同一个人对同一条愿望只算一次，<b>同一条愿望一天也只算一次</b>——所以「结实」是三次被读分散在三个日子里攒出来的，不是一晚上刷出来的。这一层要算数就不能只靠浏览器里的东西（清掉就变新人），所以它由我们自己的一个函数认人：给你一张<b>签过名的 cookie</b>，并把来源地址当场算成一个<b>每天换盐的代号</b>——地址本身不保存，二十四小时后谁也认不出来。所以「三次」约等于三台不同的设备读到过。只被停过一两次的，七天之后照样会散，那时它写的是「有人在这里停过，但还没有人接住它。」<b>自己看不算数</b>：想把自己那条断丝接上，用海报上的「把这条丝接上」，它会回到凝露，<b>但只保七天</b>；过了又散，除非有人真的读到它。「结实」始终得靠别人。</dd>
+        <dt>递出去</dt><dd>揭幕页上能把这一句递出去，三种形式随便挑：<b>链接</b>（一张自带的快照，愿望以后删掉也还打得开）、<b>二维码</b>（手机扫一下直接翻到海报）、<b>编号</b>（念给对方听，他在蛛网上输入它）。<b>一个人一天只递一次</b>——够了，剩下的靠人真的读它。这道闸只记在你这台设备上，是个仪式，不是门锁。</dd>
+        <dt>回响</dt><dd>把蛛丝上所有<b>公开</b>愿望拆成词，按出现多少排成一片，可以切换<b>云</b>与<b>列</b>两种看法。<b>仅自己可见的愿望不在里面</b>——它们从来不上蛛网，也就不会有回声。</dd>
+        <dt>一次一句</dt><dd>写下一条之后，要隔六个小时才能写第二条。丝需要时间落定。写下的那一刻不会通知任何人，也没有徽章与进度条，只有丝在变。</dd>
       </dl>
       <p><a class="link-underline" href="#/cast">现在去写下你的那一句 →</a></p>
     </div>
@@ -217,7 +313,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <noscript>
-  <p style="padding:6rem 2rem;font-family:serif">这个许愿馆需要 JavaScript 才能把愿望冲印成海报。</p>
+  <p class="nojs">这个许愿馆需要 JavaScript 才能把愿望冲印成海报。</p>
 </noscript>
 
 <script type="module" src="assets/js/app.js"></script>

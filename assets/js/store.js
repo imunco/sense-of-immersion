@@ -7,7 +7,12 @@ const K = {
   mine:   'yixian.mine.v1',
   device: 'yixian.device.v1',
   visits: 'yixian.visits.v1',
-  pending:'yixian.pending.v1'
+  pending:'yixian.pending.v1',
+  reads:  'yixian.reads.v1',    /* 这台设备读过的露珠，以及还没发出去的批次 */
+  mends:  'yixian.mends.v1',    /* 自己接上的断丝 */
+  write:  'yixian.lastwrite.v1', /* 上一次写下愿望的时刻，冷却用 */
+  share:  'yixian.shared.v1',    /* 上一次把愿望递出去的时刻，一天只递一次 */
+  given:  'yixian.readgiven.v1'  /* 上一次把「那一次被读」给了谁，一天只给一条 */
 };
 
 /* 一个只存在这台设备上的随机编号，用来在后台区分“独立设备” */
@@ -54,6 +59,139 @@ export function remember(rec) {
   write(K.mine, list.slice(0, 200));
 }
 export function forget(id) { write(K.mine, myWishes().filter(function (w) { return w.id !== id; })); }
+
+/* ---------------------------------------------------------- 冷却
+   一次许愿之后，要等一段时间才能写第二条。时间由 data/moderation.json 的
+   rate.cooldownHours 决定（前端与采集器读同一份）。前端拦的是体验，
+   采集器那一侧还会按设备再拦一次 —— 清掉 localStorage 也绕不过去。 */
+export function lastWriteAt() {
+  const v = read(K.write, 0);
+  return Number(v) || 0;
+}
+export function markWrite(ts) {
+  write(K.write, Number(ts) || Date.now());
+}
+/* ---------------------------------------------------------- 递出去
+   「一个人一天只有一次机会」只在本机记着 —— 它是个仪式，不是门锁：
+   编号本来就印在揭幕页上，谁也拦不住你念给别人听。 */
+export function shareAt() { return Number(read(K.share, 0)) || 0; }
+export function markShareAt(ts) { write(K.share, Number(ts) || Date.now()); }
+
+export function cooldownLeft(hours) {
+  const h = Number(hours);
+  if (!(h > 0)) return 0;
+  const last = lastWriteAt();
+  if (!last) return 0;
+  return Math.max(0, h * 3600e3 - (Date.now() - last));
+}
+
+/* ---------------------------------------------------------- 被读计数
+   露珠被注视超过一会儿，就在本机记一次。同一台设备对同一条只记一次，
+   攒着下次访问时一批发出去。去向是中转站，采集器把它聚合成 data/reads.json。 */
+function readLedger() {
+  const s = read(K.reads, null);
+  if (!s || typeof s !== 'object') return { done: {}, queue: [] };
+  s.done = s.done && typeof s.done === 'object' ? s.done : {};
+  s.queue = Array.isArray(s.queue) ? s.queue : [];
+  return s;
+}
+
+export function localReads() { return readLedger().done; }
+
+/* 「一个人一天只有一次机会」：24 小时里只给出一条「被读」，
+   给出去的那一条才计数。和「同一条本机只记一次」叠在一起，
+   于是同一台设备对同一条愿望一辈子也只算一次。 */
+export function readGivenAt() { return Number(read(K.given, 0)) || 0; }
+export function markReadGiven(ts) { write(K.given, Number(ts) || Date.now()); }
+
+const readAt = function (v) { return typeof v === 'number' ? v : (v && v.t) || 0; };
+
+/* base = 记下这一票时服务端已经有多少次。
+   采集器收下这一票之后，服务端就会多一次，从那以后本机不再补这一票，
+   免得同一次被数两遍。 */
+export function trackRead(id, base) {
+  if (!id) return false;
+  const s = readLedger();
+  if (s.done[id]) return false;
+  s.done[id] = { t: Date.now(), base: Number(base) || 0 };
+  if (s.queue.indexOf(id) < 0) s.queue.push(id);
+  const ids = Object.keys(s.done);
+  if (ids.length > 4000) {
+    ids.sort(function (a, b) { return readAt(s.done[a]) - readAt(s.done[b]); })
+       .slice(0, ids.length - 4000)
+       .forEach(function (k) { delete s.done[k]; });
+  }
+  write(K.reads, s);
+  return true;
+}
+
+/* 一票「被读」不直接投中转站，而是打自己的函数：
+   它当场认出这台设备（签名 cookie）、把出口网算成当天的代号，再带签名转发。
+   函数不可用（本地静态托管、没配密钥）时不回退直投 —— 没签名的读不该计数。 */
+export async function flushReads() {
+  const s = readLedger();
+  if (!s.queue.length) return 0;
+  const url = cfg.readUrl || FALLBACK.readUrl;
+  if (!url) return 0;
+  const batch = s.queue.slice(0, 20);
+  const env = await seal(deviceInfo());
+  /* 每条读消息也要挖一个证明：脚本化灌水的成本就上去了。
+     证明是绑在这一串 id 上的，函数转发时不改它们。 */
+  const bits = Number((moderation() || {}).readProofOfWork) || (cfg.proofOfWork && cfg.proofOfWork.difficulty) || 4;
+  const proof = await mineProof('yixian-read:' + batch.join(','), bits);
+  let ok = false;
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: batch, env: env, pow: proof.pow })
+    });
+    ok = r.ok;
+  } catch (e) { ok = false; }
+  if (!ok) return 0;
+  const sent = new Set(batch);
+  s.queue = s.queue.filter(function (id) { return !sent.has(id); });
+  write(K.reads, s);
+  return batch.length;
+}
+
+/* ---------------------------------------------------------- 续丝
+   「自己回来能把断丝接上」，接上只保七天。
+   所以这里不设「一辈子只能接一次」的闸：断的时候想接就接。 */
+function mendLedger() {
+  const m = read(K.mends, null);
+  if (!m || typeof m !== 'object') return { done: {}, pending: [] };
+  m.done = m.done && typeof m.done === 'object' ? m.done : {};
+  m.pending = Array.isArray(m.pending) ? m.pending : [];
+  return m;
+}
+
+export function localMends() { return mendLedger().done; }
+
+export function queueMend(id) {
+  if (!id) return false;
+  const m = mendLedger();
+  m.done[id] = Date.now();
+  if (m.pending.indexOf(id) < 0) m.pending.push(id);
+  write(K.mends, m);
+  return true;
+}
+
+export async function flushMends() {
+  const m = mendLedger();
+  if (!m.pending.length) return 0;
+  const env = await seal(deviceInfo());
+  const rest = [];
+  let sent = 0;
+  const batch = m.pending.slice(0, 20);
+  for (let i = 0; i < batch.length; i++) {
+    try { await publish({ t: 'mend', id: batch[i], at: Date.now(), env: env }); sent++; }
+    catch (e) { rest.push(batch[i]); }
+  }
+  m.pending = rest;
+  write(K.mends, m);
+  return sent;
+}
 
 /* ---------------------------------------------------------- 可靠投递
    中转站只保留 12 小时，而 GitHub 的定时任务只是"尽力而为"（可能延迟甚至不跑）。
@@ -238,6 +376,31 @@ export async function loadBlocked() {
   return blockedCache;
 }
 
+
+/* ---------------------------------------------------------- 丝的命数
+   采集器把大家报上来的「被读」聚合成 data/reads.json。它只是 id 与次数，
+   没有新的隐私：id 本来就公开在 wishes.jsonl 里。 */
+let readsCache = null;
+
+export async function loadReads() {
+  if (readsCache) return readsCache;
+  readsCache = { reads: {}, mends: {}, updated: null };
+  try {
+    const r = await fetch('data/reads.json', { cache: 'no-cache' });
+    if (r.ok) {
+      const d = await r.json();
+      readsCache = {
+        reads: (d && d.reads) || {},
+        mends: (d && d.mends) || {},
+        updated: (d && d.updated) || null
+      };
+    }
+  } catch (e) { /* 还没有 reads.json 也不影响看网 */ }
+  return readsCache;
+}
+
+export function readsSnapshot() { return readsCache || { reads: {}, mends: {}, updated: null }; }
+
 /* ---------------------------------------------------------- 审查规则 */
 let moderationCache = null;
 
@@ -359,6 +522,8 @@ export function encodeShare(rec) {
 
 export function decodeShare(token) {
   try {
+    /* 一条愿望最长也就一千来个字符，再长就是有人拿它当内存炸弹 */
+    if (!token || token.length > 4096) return null;
     let b = token.replace(/-/g, '+').replace(/_/g, '/');
     while (b.length % 4) b += '=';
     const bin = atob(b);

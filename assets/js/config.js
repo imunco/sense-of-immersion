@@ -7,6 +7,8 @@ export const FALLBACK = {
   /* 归档触发器（Vercel 函数）。留空则只用 push / 守夜人 / GitHub 定时。 */
   /* 相对路径：站点和接口在同一个域名下，换自定义域名也不用改这里 */
   pokeUrl: '/api/poke',
+  /* 「被读」走这里：由函数认出是谁、算出来源代号，再转发到中转站 */
+  readUrl: '/api/read',
   /* 站点公钥：只能用来加密，公开无所谓 */
   siteKey: {"kty":"EC","crv":"P-256","x":"84zqpZW40I7kRX8aWZbwlKQKkISjwAcR2kOvYemaAcQ","y":"DIvQxdJ26rRBzUVR9f0CahKk8WyW7fu2ooN55Eg1Kqk"},
   proofOfWork: { difficulty: 4 }

@@ -36,11 +36,57 @@ function beadSprite(rgb) {
   return c;
 }
 
+/* 每颗露珠自己那缕丝 —— 命数的四态就画在这里。
+   新结：丝细；凝露：多出几缕；结实：丝发亮；丝散：丝断，露珠悬在断丝上。
+   颜色仍跟着愿望选的那条丝走。 */
+function strand(ctx, x, y, state, rgb) {
+  const c = rgb[0] + ',' + rgb[1] + ',' + rgb[2];
+  const lift = Math.min(255, rgb[0] + 60) + ',' + Math.min(255, rgb[1] + 60) + ',' + Math.min(255, rgb[2] + 60);
+  if (state === 'fresh') {
+    ctx.strokeStyle = 'rgba(' + c + ',0.34)';
+    ctx.lineWidth = 0.55;
+    ctx.beginPath(); ctx.moveTo(x, y - 19); ctx.lineTo(x, y - 3); ctx.stroke();
+    return;
+  }
+  if (state === 'solid') {
+    ctx.strokeStyle = 'rgba(' + c + ',0.28)';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.lineTo(x, y - 3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(' + lift + ',0.74)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.lineTo(x, y - 3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(' + lift + ',0.30)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, y - 22); ctx.quadraticCurveTo(x + 6, y - 16, x + 4, y - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 16); ctx.quadraticCurveTo(x - 6, y - 11, x - 4, y - 4); ctx.stroke();
+    return;
+  }
+  if (state === 'loose') {
+    ctx.strokeStyle = 'rgba(' + c + ',0.30)';
+    ctx.lineWidth = 0.65;
+    ctx.beginPath(); ctx.moveTo(x, y - 26); ctx.lineTo(x, y - 11); ctx.stroke();   /* 断口留白 */
+    ctx.beginPath(); ctx.moveTo(x + 0.8, y - 6); ctx.lineTo(x + 0.8, y - 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(' + c + ',0.18)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, y - 11); ctx.quadraticCurveTo(x + 3, y - 8, x + 1, y - 4); ctx.stroke();
+    return;
+  }
+  /* dew */
+  ctx.strokeStyle = 'rgba(' + c + ',0.42)';
+  ctx.lineWidth = 0.62;
+  ctx.beginPath(); ctx.moveTo(x, y - 24); ctx.lineTo(x, y - 3); ctx.stroke();
+  ctx.strokeStyle = 'rgba(' + c + ',0.24)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(x, y - 18); ctx.quadraticCurveTo(x + 5, y - 13, x + 3, y - 7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.quadraticCurveTo(x - 5, y - 8, x - 3, y - 3); ctx.stroke();
+}
+
 export class SilkWeb {
   constructor(canvas, handlers) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.handlers = handlers || {};
+    this.stateOf = this.handlers.stateOf || null;
     this.wishes = [];
     this.sprites = {};
     MOODS.forEach((m) => { this.sprites[m] = beadSprite(COLOR[m]); });
@@ -49,6 +95,8 @@ export class SilkWeb {
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.running = false;
     this.t = 0;
+    this.dwellId = '';
+    this.dwellTimer = 0;
     this.bind();
     this.resize();
   }
@@ -58,9 +106,11 @@ export class SilkWeb {
       const r = this.canvas.getBoundingClientRect();
       this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
       this.hit();
+      this.armDwell(this.hover ? this.hover.wish : null);
     };
-    this.onLeave = () => { this.pointer = null; this.hover = null; this.setHover(null); this.draw(); };
+    this.onLeave = () => { this.pointer = null; this.hover = null; this.clearDwell(); this.setHover(null); this.draw(); };
     this.onDown = () => {
+      this.clearDwell();
       if (this.hover) {
         const w = this.hover.wish;
         if (this.handlers.onSelect) this.handlers.onSelect(w);
@@ -74,6 +124,27 @@ export class SilkWeb {
   }
 
   setHover(w) { if (this.handlers.onHover) this.handlers.onHover(w, this.hover ? this.hover.pos : null); }
+
+  /* 在露珠上停够一会儿，才算读过它。
+     一次连续停驻只报一次（手别抖）；离开再回来会重新起算 ——
+     去重交给上层：本机对同一条只记一次，一天又只给出一条。 */
+  armDwell(wish) {
+    const id = wish && wish.id ? wish.id : '';
+    if (!id || this.dwellId === id) return;
+    this.clearDwell();
+    this.dwellId = id;
+    this.dwellTimer = setTimeout(() => {
+      this.dwellTimer = 0;
+      if (this.dwellId !== id) return;
+      if (this.handlers.onDwell) this.handlers.onDwell(wish);
+    }, 1500);
+  }
+
+  clearDwell() {
+    if (this.dwellTimer) clearTimeout(this.dwellTimer);
+    this.dwellTimer = 0;
+    this.dwellId = '';
+  }
 
   resize() {
     const rect = this.canvas.getBoundingClientRect();
@@ -100,7 +171,12 @@ export class SilkWeb {
       const ring = 1 + ((hh >>> 5) % (this.rings - 1));
       const jr = 1 + ((((hh >>> 11) % 100) / 100) - 0.5) * 0.05;
       const ja = ((((hh >>> 17) % 100) / 100) - 0.5) * 0.05;
-      return { wish: wish, spoke: spoke, ring: ring, jr: jr, ja: ja, phase: ((hh >>> 23) % 628) / 100, born: wish.__born || 0 };
+      return {
+        wish: wish, spoke: spoke, ring: ring, jr: jr, ja: ja,
+        phase: ((hh >>> 23) % 628) / 100,
+        born: wish.__born || 0,
+        state: this.stateOf ? this.stateOf(wish) : 'dew'
+      };
     });
   }
 
@@ -120,8 +196,9 @@ export class SilkWeb {
     return { x: this.hub.x + Math.cos(a) * r, y: this.hub.y + Math.sin(a) * r };
   }
 
-  setWishes(list) {
+  setWishes(list, stateOf) {
     this.wishes = list || [];
+    if (stateOf) this.stateOf = stateOf;
     this.layout();
     this.draw();
   }
@@ -208,10 +285,13 @@ export class SilkWeb {
     ctx.arc(this.hub.x, this.hub.y, this.rMin * 1.25, 0, Math.PI * 2);
     ctx.fill();
 
-    /* 露珠 */
+    /* 露珠与它那缕丝 */
     const now = performance.now();
+    const BASE = { fresh: 26, dew: 34, solid: 46, loose: 30 };
     this.beads.forEach((b) => {
       const p = this.node(b.spoke, b.ring, b.jr, b.ja);
+      const st = b.state || 'dew';
+      const rgb = COLOR[b.wish.mood] || COLOR.silk;
       let scale = 1;
       if (b.born) {
         const age = (now - b.born) / 900;
@@ -220,20 +300,24 @@ export class SilkWeb {
       }
       const twinkle = this.reduced ? 1 : 0.86 + 0.14 * Math.sin(now / 1400 + b.phase);
       const isHover = this.hover && this.hover.wish.id === b.wish.id;
-      const size = (isHover ? 56 : 36) * scale;
+      const base = BASE[st] || BASE.dew;
+      const size = (isHover ? 56 : base) * scale;
       const sprite = this.sprites[b.wish.mood] || this.sprites.silk;
-      ctx.globalAlpha = Math.min(1, (isHover ? 1 : 0.96) * twinkle);
-      ctx.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
+      /* 丝散：露珠悬在断丝上，微微下坠 */
+      const sag = st === 'loose' ? (this.reduced ? 5 : 4 + 2.2 * Math.sin(now / 1100 + b.phase)) : 0;
+      strand(ctx, p.x, p.y, st, rgb);
+      ctx.globalAlpha = Math.min(1, (isHover ? 1 : (st === 'loose' ? 0.7 : 0.96)) * twinkle);
+      ctx.drawImage(sprite, p.x - size / 2, p.y + sag - size / 2, size, size);
       if (isHover) {
         ctx.globalAlpha = 1;
         ctx.strokeStyle = 'rgba(214,124,104,0.55)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(this.hub.x, this.hub.y);
-        ctx.lineTo(p.x, p.y);
+        ctx.lineTo(p.x, p.y + sag);
         ctx.stroke();
       }
-      b.pos = p;
+      b.pos = { x: p.x, y: p.y + sag };
     });
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -258,6 +342,7 @@ export class SilkWeb {
 
   destroy() {
     this.stop();
+    this.clearDwell();
     this.canvas.removeEventListener('pointermove', this.onMove);
     this.canvas.removeEventListener('pointerleave', this.onLeave);
     this.canvas.removeEventListener('pointerdown', this.onDown);

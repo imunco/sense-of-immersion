@@ -16,7 +16,19 @@
     "archiveCap": 20000,
     "anonymousPerHour": 20,
     "_note": "perDevicePerHour 依赖客户端自报设备号（可伪造）；globalPerHour 是服务端强制的全站上限，不依赖任何客户端字段",
-    "globalPerHour": 240
+    "globalPerHour": 240,
+    "cooldownHours": 6,
+    "readsPerSidPerDay": 1,
+    "readsPerIpPerDay": 3,
+    "readsPerWishPerDay": 1,
+    "readsGlobalPerDay": 600,
+    "readProofOfWork": 4,
+    "readsPerDevicePerDay": 1,
+    "readsAnonPerDay": 60,
+    "readsPerMessage": 400,
+    "readsPerRun": 4000,
+    "mendsPerRun": 200,
+    "_note2": "cooldownHours：一条愿望写成功之后，同一台设备要等这么久才能写第二条。前端读同一份值显示剩余时间，采集器按设备再强制一次。readsPerSidPerDay 是 1：由签名 cookie 认出来的一个身份，一天只给出一条「被读」——清 localStorage 换不掉它。readsPerIpPerDay 是 3：同一张出口网的当天兜底额度，挡「清 cookie 再来一次」；来源地址不作保存，只当场算成一个每天换盐的代号。没配 WISH_READ_SECRET 时这两项不生效，退回 readsPerDevicePerDay（按客户端自报的设备号，可伪造）。"
   },
   "proofOfWork": {
     "difficulty": 4

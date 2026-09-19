@@ -8,8 +8,9 @@
 | 后台 | https://yixian-archive.vercel.app/admin.html （无站内入口） |
 | 健康检查 | https://yixian-archive.vercel.app/api/health |
 | 触发端点 | https://yixian-archive.vercel.app/api/poke |
+| 被读端点 | https://yixian-archive.vercel.app/api/read |
 | Vercel 项目 | `xcdh520-githubs-projects/yixian-archive` |
-| 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS` |
+| 已配环境变量 | `GITHUB_DISPATCH_TOKEN`、`GITHUB_REPO`、`GITHUB_WORKFLOW`、`ALLOWED_ORIGINS`、`WISH_READ_SECRET` |
 | GitHub Pages | **已停用** |
 
 ### 站点是怎么输出的
@@ -83,6 +84,21 @@ npx vercel env add GITHUB_REPO production               # imunco/sense-of-immers
 npx vercel env add GITHUB_WORKFLOW production           # collect.yml
 npx vercel --prod
 ```
+
+### 3. 「被读」的唯一化（可选，但不配就等于没有）
+
+`api/read.js` 靠一个密钥签发 cookie、算来源代号。这个密钥必须**同时**放在
+Vercel 和 GitHub Secrets 里，两边不一样就等于没配：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+gh secret set WISH_READ_SECRET --body "<那个密钥>"
+npx vercel env add WISH_READ_SECRET production          # 粘贴同一个值
+npx vercel --prod
+```
+
+没配时函数只是原样转发、不签名，采集器不认签名过的读 —— 宁可少记，不可假记。
+本地自测可以只设进程变量：`WISH_READ_SECRET=... node tests/readid.test.mjs`。
 
 部署完会得到一个地址，例如 `https://yixian-archive.vercel.app`。验证：
 

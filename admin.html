@@ -29,6 +29,12 @@
     <p class="gate__err" id="gate-err" role="alert"></p>
     <button class="btn btn--thread" type="submit">进入放映室</button>
   </form>
+  <div id="gate-2fa" hidden>
+    <p class="gate__ask">口令对了。还需要你那把钥匙。</p>
+    <p class="gate__hint" id="gate-2fa-hint">点下面，系统会弹出 Windows Hello 或手机上的通行密钥。</p>
+    <button class="btn btn--thread" id="gate-2fa-go" type="button">用通行密钥确认</button>
+    <p class="gate__err" id="gate-2fa-err" role="alert"></p>
+  </div>
   <p><a class="link-underline" href="index.html">← 回到蛛网</a></p>
 </section>
 
@@ -45,9 +51,12 @@
         <button class="btn btn--quiet" id="refresh" type="button">刷新</button>
         <button class="btn btn--quiet" id="export-csv" type="button">导出 CSV</button>
         <button class="btn btn--quiet" id="export-json" type="button">导出 JSON</button>
+        <button class="btn btn--quiet" id="enroll-passkey" type="button">登记通行密钥</button>
         <button class="btn btn--quiet" id="sign-out" type="button">退出</button>
       </div>
     </header>
+
+    <p class="proj-notice" id="proj-notice" role="status" aria-live="polite"></p>
 
     <section class="ledger" aria-label="今夜概览">
       <p class="ledger__sentence" id="ledger-sentence">正在数…</p>

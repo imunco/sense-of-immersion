@@ -14,9 +14,11 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex } from '../shared/sha256.js';
-import { deriveKey, encryptJSON } from '../shared/crypto.js';
+import { deriveKey, encryptJSON, decryptJSON } from '../shared/crypto.js';
 import { unwrapKeyring } from '../shared/keyring.js';
 import { openFromSite } from '../shared/envelope.js';
+import { hasSecret, verifySid } from '../lib/readid.js';
+import { verifyAssertion, challengeFor, delChallengeParts } from '../shared/webauthn.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const J = (p) => resolve(ROOT, p);
@@ -29,7 +31,21 @@ const parseLines = (t) => lines(t).map((l) => { try { return JSON.parse(l); } ca
 const cfg = await readJSON(J('data/config.json'), {});
 const mod = await readJSON(J('data/moderation.json'), {});
 const L = Object.assign({ nameMin: 1, nameMax: 24, wishMin: 2, wishMax: 160, maxLinks: 0, maxRepeatRun: 8 }, mod.limits || {});
-const R = Object.assign({ perDevicePerHour: 6, anonymousPerHour: 20, globalPerHour: 240, perRunLimit: 120, perContentPerDay: 1, archiveCap: 20000 }, mod.rate || {});
+const R = Object.assign({
+  perDevicePerHour: 6, anonymousPerHour: 20, globalPerHour: 240, perRunLimit: 120,
+  perContentPerDay: 1, archiveCap: 20000,
+  cooldownHours: 6,              /* 一台设备写下一条之后的冷却时长，前端读同一份 */
+  readsPerDevicePerDay: 1,       /* 没配 WISH_READ_SECRET 时的老办法：单设备一天一条 */
+  readsAnonPerDay: 60,
+  readsPerSidPerDay: 1,          /* 签过名的一个身份一天一条 */
+  readsPerIpPerDay: 3,           /* 同一张出口网一天最多几条，挡「清 cookie 再来」 */
+  readsPerWishPerDay: 1,         /* 同一条愿望一天只算一次 —— 单条愿望刷不动 */
+  readsGlobalPerDay: 600,        /* 全站当天上限 —— 分布式农场也翻不了天 */
+  readProofOfWork: 4,            /* 每条读消息都得挖出这么多位零 */
+  readsPerMessage: 400,
+  readsPerRun: 4000,
+  mendsPerRun: 200
+}, mod.rate || {});
 const POW_BITS = (mod.proofOfWork && mod.proofOfWork.difficulty) || 4;
 const POW_PREFIX = '0'.repeat(POW_BITS);
 const BANNED = (mod.bannedWords || []).map((w) => String(w).toLowerCase()).filter(Boolean);
@@ -55,10 +71,10 @@ const isJunk = (s) => !/[\p{L}\p{N}]/u.test(s);
 const dh = (v) => sha256Hex('k:' + String(v) + ':' + ((cfg.crypto && cfg.crypto.salt) || 'nosalt')).slice(0, 24);
 
 /* ---------------------------------------------------------------- 密钥 */
-let dek = null, privateJwk = null;
+let dek = null, privateJwk = null, kek = null;
 if (PASSPHRASE && cfg.crypto && cfg.crypto.salt) {
   try {
-    const kek = await deriveKey(PASSPHRASE, cfg.crypto.salt, cfg.crypto.iterations);
+    kek = await deriveKey(PASSPHRASE, cfg.crypto.salt, cfg.crypto.iterations);
     const opened = await unwrapKeyring(kek, await readJSON(J('data/private/keys.json'), null));
     dek = opened.dek;
     privateJwk = opened.sitePrivateJwk;
@@ -95,6 +111,28 @@ const now = Date.now();
 for (const k of Object.keys(rl.devices)) { rl.devices[k] = rl.devices[k].filter((t) => now - t < DAY); if (!rl.devices[k].length) delete rl.devices[k]; }
 for (const k of Object.keys(rl.content)) { rl.content[k] = rl.content[k].filter((t) => now - t < DAY); if (!rl.content[k].length) delete rl.content[k]; }
 rl.global = rl.global.filter((t) => now - t < HOUR);
+rl.wrote = rl.wrote || {};        /* 每台设备上一次真正写下的时刻，冷却用 */
+rl.reads = rl.reads || {};        /* 被读的配额：按签名身份 / 设备号 */
+rl.readIps = rl.readIps || {};    /* 出口网代号的当天额度（代号每天换盐，追不到昨天） */
+rl.readGlobal = rl.readGlobal || [];   /* 全站最近的被读时刻 */
+rl.wishReads = rl.wishReads || {};     /* 每条愿望上一次被计数的时刻 */
+/* 只留一天内的，别让这张表越滚越大 */
+for (const k of Object.keys(rl.wishReads)) if (now - rl.wishReads[k] > DAY) delete rl.wishReads[k];
+rl.delNonces = (rl.delNonces || []).filter((x) => now - (x.t || 0) < 7 * DAY).slice(-500);
+const delNonces = new Set(rl.delNonces.map((x) => x.n));
+
+/* 丝的命数：被读计数与续丝。只有 id 与次数，没有新的隐私 */
+/* 装了通行密钥就只认硬件签过的删除指令（公钥是公开的，私钥在硬件里） */
+const passkeyPath = J('data/private/passkey.json');
+const passkey = await readJSON(passkeyPath, null);
+
+const readsPath = J('data/reads.json');
+const readsDoc = await readJSON(readsPath, { reads: {}, mends: {} });
+readsDoc.reads = readsDoc.reads || {};
+readsDoc.mends = readsDoc.mends || {};
+const deletedIds = new Set();     /* 这一轮要删掉的愿望 */
+let readsChanged = false;
+const ID_RE = /^w_[A-Za-z0-9_]{4,40}$/;
 
 /* ---------------------------------------------------------------- 拉取 */
 const cursorObj = await readJSON(J('data/cursor.json'), { since: 'all' });
@@ -104,7 +142,7 @@ if (!res.ok) { console.error('拉取失败', res.status); process.exit(1); }
 const body = await res.text();
 
 /* ---------------------------------------------------------------- 审查 */
-const stats = { in: 0, ok: 0, priv: 0, bad_shape: 0, bad_pow: 0, bad_seal: 0, bot: 0, dup: 0, rate: 0, flood: 0, blocked: 0, dup_id: 0, meta_lost: 0 };
+const stats = { in: 0, ok: 0, priv: 0, bad_shape: 0, bad_pow: 0, bad_seal: 0, bot: 0, dup: 0, rate: 0, flood: 0, blocked: 0, dup_id: 0, meta_lost: 0, del: 0, del_bad: 0, del_stale: 0, del_nopass: 0, read: 0, read_rate: 0, read_unverified: 0, read_badpow: 0, read_global: 0, read_wishpace: 0, mend: 0 };
 const accepted = [], quarantined = [], metaOut = [], vaultOut = [];
 let maxTime = Number(cursorObj.since) || 0;
 const bump = (k) => { stats[k] = (stats[k] || 0) + 1; };
@@ -139,6 +177,182 @@ function reviewContent(name, wish) {
   return null;
 }
 
+/* ---------------------------------------------------------------- 控制消息
+   中转站上除了愿望，还有三种不需要 pow 的小消息：
+     read  被读计数（攒在本机，下次访问时成批发出来）
+     mend  续丝（自己回来把断丝接上）
+     del   远程删除（口令在浏览器里派生的密钥密封，只有采集器拆得开）
+   它们都不进归档，只改 data/reads.json 与屏蔽名单。 */
+/* 一台设备一天只收一条（rate.readsPerDevicePerDay = 1）：
+   这一条是「一个人一天只有一次机会」的服务端那一半。 */
+/* 「被读」的多层审查 —— 一层一层往下筛，任何一层不过就不计数。
+   每一层挡的是一种打法：
+
+     1 形状      ids 必须是数组
+     2 签名      配了密钥就只认 /api/read 签过名的身份
+                 —— 伪造不了，清 localStorage 也换不掉
+     3 工作量证明 每条消息都得挖出 readProofOfWork 位零
+                 —— 脚本化灌水从「发个请求」变成「花 CPU」
+     4 全站额度  readsGlobalPerDay
+                 —— 换一堆代理 IP 的分布式农场也翻不了天
+     5 一个身份  readsPerSidPerDay（没配密钥时退回设备号）
+                 —— 一个人一天一条，就是「一个人一天只有一次机会」
+     6 出口网    readsPerIpPerDay
+                 —— 挡「那我清 cookie 呢」，同时给家人/公司留出余量
+     7 单条愿望  readsPerWishPerDay = 1
+                 —— 这一条最狠：同一条愿望一天只算一次，
+                    所以单条愿望无论怎么刷都只能涨一格，「结实」只能靠时间攒
+   七层里 3、4、7 不依赖任何身份，所以就算伪装成全新的人也没有额外收益。 */
+async function handleRead(raw) {
+  /* 1 形状 */
+  if (!Array.isArray(raw.ids) || !raw.ids.length) return;
+  const rawIds = raw.ids.map((x) => String(x || ''));
+
+  /* 2 签名 */
+  const signed = hasSecret(process.env);
+  let subject = '', quota = 0, iph = '';
+  if (signed) {
+    const idt = raw.idt || {};
+    const sid = String(idt.sid || '').slice(0, 64);
+    const exp = Number(idt.exp) || 0;
+    /* 我们签发的 sid 只可能是 base64url；字符集不对就当作伪造 */
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(sid) || !verifySid(process.env, sid, exp, idt.sig)) { stats.read_unverified++; return; }
+    if (exp < now - DAY) { stats.read_unverified++; return; }
+    subject = 'sid:' + sid;
+    quota = Math.max(1, Number(R.readsPerSidPerDay) || 1);
+    /* 来源代号只可能是 24 位十六进制；别的字符串一律当没有 ——
+       它是对象的键，放进 __proto__ / constructor 这类值会出事 */
+    iph = /^[0-9a-f]{24}$/.test(String(raw.iph || '')) ? String(raw.iph) : '';
+  } else {
+    let dv = '';
+    if (privateJwk && raw.env) { try { dv = norm((await openFromSite(privateJwk, raw.env)).dv, 24); } catch {} }
+    subject = 'dev:' + (dv ? dh(dv) : 'anon');
+    quota = dv ? R.readsPerDevicePerDay : R.readsAnonPerDay;
+  }
+
+  /* 3 工作量证明（绑在这一串 id 上，函数转发时不改它们） */
+  const bits = Number(R.readProofOfWork) || 0;
+  if (bits > 0) {
+    const pow = String(raw.pow == null ? '' : raw.pow).slice(0, 24);
+    const zero = '0'.repeat(bits);
+    if (!/^[A-Za-z0-9]{1,24}$/.test(pow) ||
+        sha256Hex('yixian-read:' + rawIds.join(',') + '|' + pow).slice(0, bits) !== zero) {
+      stats.read_badpow++;
+      return;
+    }
+  }
+
+  /* 4 全站当天额度 */
+  rl.readGlobal = rl.readGlobal.filter((t) => now - t < DAY);
+  const globalCap = Number(R.readsGlobalPerDay) || 0;
+  if (globalCap > 0 && rl.readGlobal.length >= globalCap) { stats.read_global++; return; }
+
+  /* 5 一个身份一天一条 */
+  const day = rl.reads[subject] || { n: 0, t: now };
+  if (now - (day.t || 0) > DAY) { day.n = 0; day.t = now; }
+
+  /* 6 出口网 */
+  let ipHits = null;
+  if (iph) {
+    ipHits = (rl.readIps[iph] || []).filter((t) => now - t < DAY);
+    const ipCap = Number(R.readsPerIpPerDay) || 0;
+    if (ipCap > 0 && ipHits.length >= ipCap) { stats.read_rate++; rl.readIps[iph] = ipHits; return; }
+  }
+
+  const budget = Math.min(quota - day.n, R.readsPerMessage, R.readsPerRun - stats.read);
+  if (budget <= 0) { stats.read_rate++; rl.reads[subject] = day; return; }
+
+  /* 7 单条愿望一天只算一次 */
+  const wishCap = Math.max(1, Number(R.readsPerWishPerDay) || 1);
+  const seen = new Set();
+  let counted = 0;
+  for (const id of rawIds) {
+    if (counted >= budget) break;
+    if (!ID_RE.test(id) || seen.has(id) || blocked.has(id)) continue;
+    seen.add(id);
+    const last = Number(rl.wishReads[id]) || 0;
+    if (wishCap > 0 && last && now - last < DAY) { stats.read_wishpace++; continue; }
+    readsDoc.reads[id] = Math.min(99999, (Number(readsDoc.reads[id]) || 0) + 1);
+    rl.wishReads[id] = now;
+    counted++;
+  }
+
+  if (counted) {
+    day.n += counted;
+    rl.reads[subject] = day;
+    if (iph) rl.readIps[iph] = (ipHits || []).concat([now]);
+    rl.readGlobal = rl.readGlobal.concat([now]);
+    stats.read += counted;
+    readsChanged = true;
+  }
+}
+
+/* 续丝只保七天，所以同一条可以再接（每接一次，时间戳往后走）。
+   用客户端报的时刻，但夹在 [过去, 现在] 之间 —— 旧消息重放不会续命。 */
+async function handleMend(raw) {
+  const id = String(raw.id || '');
+  if (!ID_RE.test(id) || blocked.has(id)) return;
+  if (!seenIds.has(id)) return;          /* 只给已经挂上蛛丝的愿望续丝 */
+  if (stats.mend >= R.mendsPerRun) return;
+  const at = Math.min(now, Number(raw.at) || now);
+  if (at <= (Number(readsDoc.mends[id]) || 0)) return;
+  readsDoc.mends[id] = at;
+  stats.mend++;
+  readsChanged = true;
+}
+
+async function handleDelete(raw) {
+  if (!kek || !raw.seal) { stats.del_bad++; return; }
+  let order = null;
+  try { order = await decryptJSON(kek, raw.seal); } catch { stats.del_bad++; return; }
+  if (!order || !Array.isArray(order.ids) || !order.ids.length) { stats.del_bad++; return; }
+  const at = Number(order.at) || 0;
+  if (at && now - at > 7 * DAY) { stats.del_stale++; return; }
+
+  /* 装了通行密钥：口令再对也不算数，得有硬件在这次的指令上签过名。
+     挑战绑的是「要删哪些 id + nonce + 时刻」，改一个字就验不过，重放也无效。 */
+  if (passkey && passkey.publicJwk) {
+    const a = order.assert || {};
+    let challenge = '';
+    try { challenge = await challengeFor(delChallengeParts(order.ids, order.nonce, at)); } catch (e) { challenge = ''; }
+    const okPass = challenge
+      ? await verifyAssertion(passkey.publicJwk, {
+        clientDataJSON: a.clientDataJSON,
+        authData: a.authData,
+        signature: a.signature,
+        expectedChallenge: challenge,
+        expectedRpId: passkey.rpId,
+        expectedOrigin: passkey.origin
+      })
+      : false;
+    if (!okPass) { stats.del_nopass++; return; }
+  }
+  const nonce = String(order.nonce || '').slice(0, 64);
+  if (nonce) {
+    if (delNonces.has(nonce)) return;    /* 重放：删两次等于删一次 */
+    delNonces.add(nonce);
+    rl.delNonces.push({ n: nonce, t: now });
+  }
+  const list = order.ids.slice(0, 200);
+  for (const item of list) {
+    const id = String(item || '');
+    if (!ID_RE.test(id)) continue;
+    blocked.add(id);
+    deletedIds.add(id);
+    stats.del++;
+  }
+}
+
+/* 从一份 jsonl 里把某些 id 整行拿掉 */
+async function dropFromJsonl(path, ids) {
+  const text = await readText(path);
+  if (!text) return;
+  const kept = lines(text).filter((line) => {
+    try { return !ids.has(JSON.parse(line).id); } catch { return true; }
+  });
+  await writeFile(path, kept.length ? kept.join('\n') + '\n' : '');
+}
+
 for (const line of body.split('\n')) {
   if (!line.trim()) continue;
   let ev; try { ev = JSON.parse(line); } catch { continue; }
@@ -147,6 +361,16 @@ for (const line of body.split('\n')) {
   stats.in++;
 
   let raw; try { raw = JSON.parse(ev.message); } catch { bump('bad_shape'); continue; }
+
+  /* 控制消息：被读 / 续丝 / 远程删除 */
+  if (raw && typeof raw === 'object' && raw.t) {
+    if (raw.t === 'read') await handleRead(raw);
+    else if (raw.t === 'mend') await handleMend(raw);
+    else if (raw.t === 'del') await handleDelete(raw);
+    else bump('bad_shape');
+    continue;
+  }
+
   const shape = vetShape(raw);
   if (shape.drop) { bump(shape.drop); continue; }
   const id = shape.id;
@@ -209,6 +433,15 @@ for (const line of body.split('\n')) {
     why = '全站一小时内已达 ' + rl.global.length + ' 条上限';
   }
 
+  /* 冷却：写下一条之后，同一台设备要等 cooldownHours 才能再写 */
+  const cdMs = (Number(R.cooldownHours) || 0) * HOUR;
+  if (!why && cdMs > 0) {
+    const lastAt = Number(rl.wrote[deviceKey]) || 0;
+    if (lastAt && now - lastAt < cdMs) {
+      why = '同一台设备在冷却期内（' + R.cooldownHours + ' 小时）又写了一条';
+    }
+  }
+
   seenIds.add(id);
   seenContent.add(contentHash);
   rl.content[contentHash] = (rl.content[contentHash] || []).concat([now]);
@@ -219,6 +452,7 @@ for (const line of body.split('\n')) {
 
   const record = { id, name, wish, mood, ts, vis: shape.vis, reason: why || null, meta };
 
+  if (!why) rl.wrote[deviceKey] = now;   /* 冷却从真正写下这一刻起算 */
   if (why) quarantined.push(record);
   else if (shape.vis === 'private') vaultOut.push(record);
   else {
@@ -228,12 +462,26 @@ for (const line of body.split('\n')) {
 }
 
 /* ---------------------------------------------------------------- 落盘 */
+/* 远程删除：口令持有者在放映室里发出的指令，在这一步落地 */
+if (deletedIds.size) {
+  for (const id of deletedIds) {
+    byId.delete(id);
+    delete readsDoc.reads[id];
+    delete readsDoc.mends[id];
+  }
+  readsChanged = true;
+  await dropFromJsonl(vaultPath, deletedIds);
+  await dropFromJsonl(queuePath, deletedIds);
+  await dropFromJsonl(metaPath, deletedIds);
+}
+
 const acceptedIds = new Set(accepted.map((r) => r.id));
 const merged = accepted.concat([...byId.values()].filter((r) => !acceptedIds.has(r.id)));
 merged.sort((a, b) => (a.ts || 0) - (b.ts || 0));
 const overCap = Math.max(0, merged.length - R.archiveCap);
 const finalList = overCap ? merged.slice(overCap) : merged;
-if (accepted.length || overCap) {
+/* 有远程删除时也必须重写归档，哪怕这一轮没有新愿望 */
+if (accepted.length || overCap || deletedIds.size) {
   await mkdir(dirname(archivePath), { recursive: true });
   await writeFile(archivePath, finalList.map((r) => JSON.stringify(r)).join('\n') + (finalList.length ? '\n' : ''));
 }
@@ -274,22 +522,27 @@ if (blocked.size) {
       });
     }
   } catch (e) { relayIds = null; }
+  let list = Array.from(blocked);
   if (relayIds) {
     const archiveIds = new Set(finalList.map((r) => r.id));
-    const keep = [];
-    for (const id of blocked) if (archiveIds.has(id) || relayIds.has(id)) keep.push(id);
-    if (keep.length !== blocked.size) {
-      await writeJSON(J('data/blocked.json'), keep.sort());
-      pruned = blocked.size - keep.length;
-    }
+    list = list.filter((id) => archiveIds.has(id) || relayIds.has(id));
+    pruned = blocked.size - list.length;
   }
+  /* 有新的远程删除时，即使中转站读不到也要把名单写下去，不能丢 */
+  if (pruned || deletedIds.size) await writeJSON(J('data/blocked.json'), list.sort());
 }
 
 rl.total = (rl.total || 0) + accepted.length + vaultOut.length;
 const dkeys = Object.keys(rl.devices);
 if (dkeys.length > 5000) for (const k of dkeys.slice(0, dkeys.length - 5000)) delete rl.devices[k];
+const wkeys = Object.keys(rl.wrote);
+if (wkeys.length > 5000) for (const k of wkeys.slice(0, wkeys.length - 5000)) delete rl.wrote[k];
 await writeJSON(rlPath, rl);
-if (accepted.length || quarantined.length || vaultOut.length) {
+if (readsChanged) {
+  readsDoc.updated = new Date().toISOString();
+  await writeJSON(readsPath, readsDoc);
+}
+if (accepted.length || quarantined.length || vaultOut.length || deletedIds.size || readsChanged) {
   await writeJSON(J('data/cursor.json'), { since: maxTime || Math.floor(Date.now() / 1000), updated: new Date().toISOString() });
 }
 
@@ -301,8 +554,15 @@ console.log(JSON.stringify({
   丢弃: {
     形状不符: stats.bad_shape, 凭证无效: stats.bad_pow, 密封损坏: stats.bad_seal,
     疑似机器人: stats.bot, 重复内容: stats.dup, 重复id: stats.dup_id,
-    已屏蔽: stats.blocked, 超量截断: stats.flood
+    已屏蔽: stats.blocked, 超量截断: stats.flood,
+    删除指令无效: stats.del_bad, 删除指令过期: stats.del_stale, 被读超量: stats.read_rate,
+    删除缺通行密钥: stats.del_nopass,
+    被读未签名: stats.read_unverified, 被读证明无效: stats.read_badpow,
+    被读全站超额: stats.read_global, 被读同愿同日: stats.read_wishpace
   },
+  删除: stats.del,
+  被读: stats.read,
+  续丝: stats.mend,
   归档: finalList.length,
   屏蔽名单: blocked.size - pruned + ' 条' + (pruned ? '（自动清掉 ' + pruned + ' 条过期的）' : ''),
   元数据: metaSaved,
