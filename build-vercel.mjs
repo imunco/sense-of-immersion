@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(ROOT, 'public');
 /* shared/ 是浏览器要 import 的模块（store.js → ../../shared/sha256.js），必须一起输出 */
-const ITEMS = ['index.html', 'admin.html', 'assets', 'data', 'shared', 'robots.txt', 'sitemap.xml'];
+/* 4d832bc9b5ce7f69cbfba3d6144efaa7.txt 是 IndexNow 的密钥文件，必须躺在站点根目录，内容就是密钥本身 */
+const ITEMS = ['index.html', 'admin.html', 'assets', 'data', 'shared', 'robots.txt', 'sitemap.xml', '4d832bc9b5ce7f69cbfba3d6144efaa7.txt'];
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
