@@ -10,3 +10,6 @@ Disallow: /api/
 Disallow: /shared/
 Disallow: /lib/
 Disallow: /*.md$
+
+# 站点地图：让「一线千愿」这四个字可被检索
+Sitemap: https://uncodeapps.icu/sitemap.xml

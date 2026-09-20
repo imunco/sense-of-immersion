@@ -20,6 +20,10 @@ backups/
 
 node_modules/
 tests/shots/
+
+# 预告片的中间产物与成片：可以重跑，别进仓库（见 trailer/README.md）
+trailer/stills/
+trailer/out/
 package-lock.json
 .DS_Store
 Thumbs.db
