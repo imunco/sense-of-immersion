@@ -51,8 +51,8 @@ out/
 ## 让「一线千愿」这四个字能被搜到
 
 平台版不能给链接，那用户怎么找过来？**靠名字。**
-但我查过了，**现在搜索引擎里搜「一线千愿」一条结果都没有**，所以这条路现在还不通。
-我把仓库里能做的先做了，剩下要拿账号去做的也写在下面。
+但我查过了，**现在搜索引擎里搜「一线千愿」一条结果都没有**，所以这条路还得先把站点推到引擎面前。
+下面是已经做完的，和只剩你要点一下的。
 
 ### 已经做好的（在仓库里）
 
@@ -63,16 +63,41 @@ out/
 - `assets/og-cover.jpg`：1200×630 的分享卡，微信、知乎、B 站抓链接预览时用的就是它。
 - `index.html` 里预留了两行注释掉的验证 meta，拿到验证码填上即可。
 
-### 还要你做的
+### 已经做完并核对过线上的
 
-1. **先部署**：提交并推上去，Vercel 会重跑 `build-vercel.mjs`，把新的 `index.html`、`sitemap.xml`、
-   `assets/og-cover.jpg` 一起发出去。验证类的东西不部署就等于没填。
-2. **Bing**：验证码已经填进 `index.html` 的 `msvalidate.01` 了。部署完回到那个页面点「验证」，
-   通过后提交 `https://uncodeapps.icu/sitemap.xml`。Bing 收录比百度快得多，索引还会被别的引擎借用。
-3. **百度搜索资源平台** → 添加站点 `uncodeapps.icu` → 验证方式选「HTML 标签」→
-   把给的 `<meta name="baidu-site-verification" …>` 填进 `index.html` 里预留的那一行（现在还是注释）→ 再部署一次 → 提交 sitemap。
-4. 想在 Bing 上更快：可以上 IndexNow（一个放在根目录的密钥文件 + 一次 POST），
-   能跟现有的定时任务接起来，改动即刻推送。需要的话再说。
+对着 `https://uncodeapps.icu` 实测（不是「文件里写了」，是线上真的这样）：
+
+| 项 | 线上结果 |
+|---|---|
+| 结构化数据 | 合法 JSON，`@type=WebSite`，name=`一线千愿` |
+| canonical | `https://uncodeapps.icu/` |
+| og:image | `https://uncodeapps.icu/assets/og-cover.jpg` → 200 image/jpeg |
+| Bing 验证 meta | 内容正确，已在 `<head>` 里 |
+| sitemap.xml | 合法 XML，1 条地址 |
+| robots.txt | 已声明 `Sitemap:` |
+| IndexNow 密钥文件 | 可访问，内容正确 |
+
+**IndexNow 已经提交过一次**（202 Accepted）——Bing、Yandex、Seznam、Naver 会主动来抓，
+不用等站长后台走完流程。以后站点有改动，跑一次就行：
+
+```bash
+node scripts/indexnow.mjs          # 提交首页
+node scripts/indexnow.mjs /web     # 提交指定路径
+```
+
+### 只剩一步：去 Bing 后台点「验证」
+
+Bing 的验证动作必须在账号里点，这个我替不了。但**验证码已经上线了，点一下就会通过**。
+通过后提交 `https://uncodeapps.icu/sitemap.xml`。
+
+之后的节奏：Bing 快的话几小时到几天开始有结果，百度常见一到四周。
+等能搜到「一线千愿」，平台版片尾那句「在搜索框里写下这四个字」才真正接得上。
+
+### 百度（等你有空再说）
+
+百度搜索资源平台 → 添加站点 `uncodeapps.icu` → 验证方式选「HTML 标签」→
+把给的 `<meta name="baidu-site-verification" …>` 填进 `index.html` 里预留的那一行（现在还是注释）→ 再部署 → 提交 sitemap。
+把验证码发我也行，我填。
 3. 等。首次收录通常 3 天到 4 周。**这期间小红书只负责让人记住名字，点击入口放在允许外链的地方。**
 4. 想让名字更快被搜到，下面这些地方各发一次（收录快、也允许放链接），标题里都写「一线千愿」：
    知乎回答或文章、B 站视频简介、微博、微信公众号文章（用「阅读原文」）、豆瓣、即刻、少数派。
