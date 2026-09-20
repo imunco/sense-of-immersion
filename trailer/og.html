@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>一线千愿 · 分享卡</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/trailer/node_modules/@fontsource/noto-serif-sc/chinese-simplified-400.css">
+<link rel="stylesheet" href="/trailer/node_modules/@fontsource/noto-serif-sc/chinese-simplified-900.css">
+<style>
+:root{
+  --paper:oklch(0.9745 0.0115 92); --paper-warm:oklch(0.9805 0.0175 62);
+  --sky:oklch(0.9620 0.0200 148); --water:oklch(0.9180 0.0430 187); --water-deep:oklch(0.8680 0.0560 194);
+  --ink:oklch(0.3350 0.0380 205); --ink-soft:oklch(0.4800 0.0300 205); --ink-faint:oklch(0.6350 0.0210 205);
+  --ink-ghost:oklch(0.7100 0.0160 205);
+  --silk:oklch(0.6700 0.1300 32);
+  --cjk:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --display:"Bodoni Moda",var(--cjk);
+  --credit:"Cinzel",var(--cjk);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1200px;height:630px;overflow:hidden}
+body{font-family:var(--cjk);color:var(--ink);-webkit-font-smoothing:antialiased}
+#card{position:absolute;inset:0;overflow:hidden;background:
+  radial-gradient(120% 90% at 16% -20%, oklch(0.9880 0.0200 86) 0%, transparent 62%),
+  radial-gradient(80% 70% at 96% 4%, oklch(0.9820 0.0250 152) 0%, transparent 58%),
+  linear-gradient(168deg, var(--paper-warm) 0%, var(--paper) 30%, var(--sky) 62%, var(--water) 86%, var(--water-deep) 100%)}
+.thread{position:absolute;left:26%;top:0;width:2px;height:630px;background:linear-gradient(180deg,color-mix(in oklab,var(--silk) 12%,transparent),color-mix(in oklab,var(--silk) 44%,transparent) 24%,color-mix(in oklab,var(--silk) 38%,transparent) 74%,color-mix(in oklab,var(--silk) 8%,transparent))}
+.thread::after{content:"";position:absolute;left:50%;top:28%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--silk);opacity:.75}
+.vig{position:absolute;inset:0;background:radial-gradient(126% 100% at 50% 44%, transparent 54%, oklch(0.55 0.03 200 / 0.12) 100%);mix-blend-mode:multiply}
+.in{position:absolute;left:84px;right:84px;top:96px}
+.eyebrow{font-family:var(--credit);font-weight:600;font-size:22px;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft)}
+h1{position:relative;margin-top:26px;font-weight:900;font-size:132px;line-height:1.02;letter-spacing:.04em;color:var(--silk)}
+h1 span{position:absolute;left:-11px;top:-13px;color:var(--ink-ghost);opacity:.55;z-index:-1}
+.lede{margin-top:26px;font-weight:400;font-size:34px;line-height:1.5;color:var(--ink-soft)}
+.rule{margin-top:30px;width:980px;height:1px;background:color-mix(in oklab,var(--ink) 22%,transparent)}
+.foot{margin-top:22px;display:flex;align-items:center;gap:20px}
+.foot .url{font-family:var(--display);font-weight:600;font-size:44px;letter-spacing:.05em;color:var(--ink)}
+.foot .stars{font-family:Jost,sans-serif;color:var(--silk);letter-spacing:.26em;font-size:20px}
+.foot .cn{font-size:24px;color:var(--ink-faint);letter-spacing:.14em}
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="thread"></div>
+  <div class="vig"></div>
+  <div class="in">
+    <p class="eyebrow">A Wish Cinema · 众人合著</p>
+    <h1><span>一线千愿</span>一线千愿</h1>
+    <p class="lede">蛛丝很细，却挂得住一千个愿望。写下一句话，它会被冲印成一张还没有拍出来的电影海报，挂上蛛网。</p>
+    <div class="rule"></div>
+    <div class="foot">
+      <span class="url">uncodeapps.icu</span>
+      <span class="stars">★★★★★</span>
+      <span class="cn">没有账号 · 没有点赞 · 没有评论</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

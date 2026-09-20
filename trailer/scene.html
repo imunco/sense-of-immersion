@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>一线千愿 · 预告片</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/trailer/node_modules/@fontsource/noto-serif-sc/chinese-simplified-400.css">
+<link rel="stylesheet" href="/trailer/node_modules/@fontsource/noto-serif-sc/chinese-simplified-600.css">
+<link rel="stylesheet" href="/trailer/node_modules/@fontsource/noto-serif-sc/chinese-simplified-900.css">
+<style>
+:root{
+  --paper:oklch(0.9745 0.0115 92);
+  --paper-warm:oklch(0.9805 0.0175 62);
+  --sky:oklch(0.9620 0.0200 148);
+  --water:oklch(0.9180 0.0430 187);
+  --water-deep:oklch(0.8680 0.0560 194);
+  --water-line:oklch(0.8200 0.0450 192);
+  --ink:oklch(0.3350 0.0380 205);
+  --ink-soft:oklch(0.4800 0.0300 205);
+  --ink-faint:oklch(0.6350 0.0210 205);
+  --ink-ghost:oklch(0.7100 0.0160 205);
+  --thread:oklch(0.6700 0.1300 32);
+  --rule:color-mix(in oklab, var(--ink) 14%, transparent);
+  --rule-strong:color-mix(in oklab, var(--ink) 30%, transparent);
+  --font-cjk:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --font-display:"Bodoni Moda",var(--font-cjk);
+  --font-credit:"Cinzel",var(--font-cjk);
+  --font-ui:"Jost","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --thread-x:172px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:oklch(0.9745 0.0115 92)}
+body{font-family:var(--font-cjk);color:var(--ink);-webkit-font-smoothing:antialiased}
+#stage{position:absolute;inset:0;width:1080px;height:1920px;overflow:hidden}
+
+.field{position:absolute;inset:-8%;background:
+  radial-gradient(118% 62% at 20% -8%, oklch(0.9880 0.0200 86) 0%, transparent 60%),
+  radial-gradient(86% 52% at 94% 6%, oklch(0.9820 0.0250 152) 0%, transparent 58%),
+  linear-gradient(177deg, var(--paper-warm) 0%, var(--paper) 24%, var(--sky) 50%, var(--water) 76%, var(--water-deep) 100%);
+  will-change:transform}
+.field__band{position:absolute;left:0;right:0;top:74.6%;height:1px;background:linear-gradient(90deg,transparent,color-mix(in oklab,var(--water-line) 70%,transparent) 22%,color-mix(in oklab,var(--water-line) 70%,transparent) 78%,transparent)}
+.field__glow{position:absolute;left:-14%;top:-22%;width:86%;height:62%;background:radial-gradient(closest-side, oklch(0.9950 0.0150 90 / 0.85), transparent 72%);filter:blur(30px)}
+.vignette{position:absolute;inset:0;background:radial-gradient(128% 96% at 50% 42%, transparent 52%, oklch(0.55 0.03 200 / 0.13) 100%);mix-blend-mode:multiply}
+.grain{position:absolute;inset:-40px;opacity:.45;image-rendering:pixelated;will-change:background-position}
+#bloom{position:absolute;inset:0;background:var(--paper)}
+#curtain{position:absolute;inset:0;background:linear-gradient(177deg,var(--paper-warm),var(--paper) 30%,var(--sky) 70%,var(--water));opacity:0}
+#z-web{position:absolute;left:0;top:-150px;width:1080px;height:1240px;opacity:0}
+#z-web svg{width:1080px;height:1240px}
+
+.thread{position:absolute;left:var(--thread-x);top:0;width:2px;height:1920px;background:linear-gradient(180deg,color-mix(in oklab,var(--thread) 12%,transparent) 0%,color-mix(in oklab,var(--thread) 44%,transparent) 20%,color-mix(in oklab,var(--thread) 38%,transparent) 72%,color-mix(in oklab,var(--thread) 8%,transparent) 100%);transform-origin:50% 0}
+.thread::after{content:"";position:absolute;left:50%;top:29%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--thread);opacity:.75;box-shadow:0 0 14px 3px color-mix(in oklab,var(--thread) 55%,transparent)}
+
+.beat{position:absolute;inset:0;display:none}
+.eyebrow{font-family:var(--font-credit);font-weight:600;font-size:25px;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft);text-indent:.42em}
+.credit{font-family:var(--font-credit);font-size:22px;letter-spacing:.30em;color:var(--ink-faint)}
+.ui{font-family:var(--font-ui);font-size:22px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint)}
+.rule-x{height:1px;background:var(--rule-strong);transform-origin:0 50%;transform:scaleX(0)}
+.caret{display:inline-block;width:4px;height:.72em;margin-left:.07em;background:var(--thread);vertical-align:-0.04em}
+.stars{font-family:var(--font-ui);color:var(--thread);letter-spacing:.28em;font-size:22px}
+
+#mast{position:absolute;left:76px;right:76px;top:64px;display:flex;align-items:flex-start;justify-content:space-between;z-index:6}
+#mast .mk{font-weight:900;font-size:38px;letter-spacing:.06em;line-height:1;color:var(--ink)}
+#mast .mk i{display:block;font-style:normal;font-family:var(--font-credit);font-size:16px;letter-spacing:.42em;color:var(--ink-faint);margin-top:13px}
+#mast nav{display:flex;gap:34px;font-size:24px;color:var(--ink-soft);padding-top:9px}
+
+/* 第一幕 */
+#t-eyebrow{position:absolute;left:0;right:0;top:372px;text-align:center}
+#t-title{position:absolute;left:0;right:0;top:496px;text-align:center;height:250px;z-index:2}
+#t-title .line{position:relative;display:inline-block;white-space:nowrap;font-weight:900;font-size:188px;line-height:1.06;letter-spacing:.035em;color:var(--thread)}
+#t-ghost{position:absolute;left:0;right:0;top:496px;text-align:center;height:250px;color:var(--ink-ghost);pointer-events:none;z-index:2}
+#t-ghost .line{position:relative;display:inline-block;white-space:nowrap;font-weight:900;font-size:188px;line-height:1.06;letter-spacing:.035em}
+#t-title .line>span,#t-ghost .line>span{display:inline-block;overflow:hidden;padding:0 .012em}
+#t-title .line span i,#t-ghost .line span i{display:inline-block;font-style:normal}
+#t-reflect{position:absolute;left:0;right:0;top:696px;text-align:center;pointer-events:none;z-index:1;
+  -webkit-mask-image:linear-gradient(to bottom, oklch(0 0 0 / .55), transparent 60%);
+  mask-image:linear-gradient(to bottom, oklch(0 0 0 / .55), transparent 60%)}
+#t-reflect .line{display:inline-block;white-space:nowrap;font-weight:900;font-size:188px;line-height:1.06;letter-spacing:.035em;color:var(--thread);opacity:.42;filter:blur(1.6px);transform:scaleY(-1)}
+#t-rule{position:absolute;left:50px;top:600px;width:980px;z-index:1;transform-origin:50% 50%}
+#t-lede{position:absolute;left:0;right:0;top:940px;text-align:center;font-weight:400;font-size:47px;line-height:1.72;color:var(--ink-soft)}
+#t-credits{position:absolute;left:80px;right:80px;bottom:168px;display:flex;align-items:center;justify-content:center;gap:22px}
+#t-credits .zh{font-family:var(--font-cjk);font-size:23px;letter-spacing:.1em;color:var(--ink-faint)}
+
+/* 第二幕 */
+#n-stage{position:absolute;left:0;right:0;top:250px;height:760px}
+#n-bead{position:absolute;left:0;right:0;top:0;height:760px;text-align:center}
+#n-bead svg{display:inline-block}
+#n-drip{position:absolute;left:540px;top:-250px;width:2px;height:382px;background:linear-gradient(180deg,transparent,color-mix(in oklab,var(--thread) 48%,transparent));transform-origin:50% 0}
+#n-lines{position:absolute;left:112px;top:1130px;width:880px}
+#n-lines p{font-weight:400;font-size:52px;line-height:1.66;color:var(--ink);margin-bottom:36px}
+#n-lines p b{font-weight:900;color:var(--thread)}
+#n-foot{position:absolute;left:112px;bottom:150px;display:flex;gap:18px;align-items:baseline}
+#n-ripple{position:absolute;left:540px;top:530px;width:300px;height:300px;margin:-150px 0 0 -150px;border-radius:50%;border:1px solid color-mix(in oklab,var(--thread) 55%,transparent)}
+#n-horizon{position:absolute;left:0;right:0;top:1495px;height:1px;transform:scaleX(0);background:linear-gradient(90deg,transparent,color-mix(in oklab,var(--water-line) 80%,transparent) 20%,color-mix(in oklab,var(--water-line) 80%,transparent) 80%,transparent)}
+
+/* 幕头 */
+.acthead{position:absolute;left:112px;right:112px;display:grid;grid-template-columns:auto auto 1fr auto;align-items:baseline;gap:0 26px}
+.acthead .no{font-family:var(--font-credit);font-size:23px;letter-spacing:.36em;color:var(--ink-faint);text-transform:uppercase}
+.acthead .name{font-weight:900;font-size:104px;line-height:1;letter-spacing:.05em}
+.acthead .bar{height:1px;background:var(--rule-strong);transform-origin:0 50%;position:relative;top:-10px;transform:scaleX(0)}
+.acthead .en{font-family:var(--font-credit);font-size:23px;letter-spacing:.36em;color:var(--ink-faint);text-transform:uppercase}
+.lede{position:absolute;left:112px;right:112px;font-weight:400;font-size:38px;line-height:1.86;color:var(--ink-soft)}
+
+/* 第三幕 */
+#c-field{position:absolute;left:112px;right:112px;top:780px}
+#c-label{font-family:var(--font-credit);font-size:21px;letter-spacing:.34em;color:var(--ink-faint);text-transform:uppercase}
+#c-input{position:relative;margin-top:26px;height:158px}
+#c-name{position:absolute;left:4px;bottom:28px;font-weight:900;font-size:122px;line-height:1;letter-spacing:.04em}
+#c-line{position:absolute;left:0;bottom:0;width:100%;height:1px;background:var(--rule-strong);transform-origin:0 50%;transform:scaleX(0)}
+#c-credit{position:absolute;left:112px;top:1140px;display:flex;align-items:baseline;gap:18px}
+#c-credit b{font-weight:900;font-size:42px;color:var(--ink)}
+#c-next{position:absolute;left:112px;top:1360px}
+.pill{display:inline-flex;align-items:center;justify-content:center;height:104px;padding:0 62px;border-radius:999px;background:var(--thread);color:oklch(0.985 0.01 92);font-family:var(--font-ui);font-weight:500;font-size:30px;letter-spacing:.14em;box-shadow:0 26px 50px -22px color-mix(in oklab,var(--thread) 62%,transparent)}
+
+/* 第四幕 */
+.poster{position:relative;width:940px;aspect-ratio:16/9;overflow:hidden;
+  background:linear-gradient(148deg, oklch(0.9860 0.0150 88) 0%, oklch(0.9700 0.0250 168) 46%, oklch(0.9250 0.0450 192) 100%);
+  box-shadow:0 44px 96px -46px oklch(0.45 0.05 200 / .34)}
+.poster__in{position:absolute;inset:0;padding:52px 62px 46px}
+.poster__eyebrow{font-family:var(--font-credit);font-size:23px;letter-spacing:.30em;color:var(--ink-soft);text-transform:uppercase}
+.poster__eyebrow b{font-family:var(--font-cjk);font-weight:900;letter-spacing:.08em;color:var(--ink)}
+.poster__title{margin-top:26px;font-weight:900;color:var(--thread);line-height:1.1;letter-spacing:.01em;text-wrap:balance}
+.poster__rule{margin-top:30px;width:132px;height:1px;background:color-mix(in oklab,var(--ink) 30%,transparent);transform-origin:0 50%;transform:scaleX(0)}
+.poster__sub{margin-top:20px;font-family:var(--font-display);font-style:italic;font-size:24px;letter-spacing:.04em;color:var(--ink-faint)}
+.poster__meta{position:absolute;left:62px;right:62px;bottom:42px;display:flex;align-items:center;gap:18px;font-family:var(--font-ui);font-size:19px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-faint)}
+.poster__meta .stars{font-size:19px;letter-spacing:.24em}
+#w-poster{position:absolute;left:70px;top:570px}
+#w-ghost{position:absolute;left:70px;top:1100px;width:940px;height:200px;overflow:hidden;opacity:0;filter:blur(2.5px);pointer-events:none;
+  -webkit-mask-image:linear-gradient(to bottom, oklch(0 0 0 / .8), transparent);mask-image:linear-gradient(to bottom, oklch(0 0 0 / .8), transparent)}
+#w-ghost .poster__title{color:var(--thread)}
+#w-picker{position:absolute;left:112px;right:112px;top:1300px}
+#w-picks{display:flex;gap:16px;margin-top:24px}
+.tpick{position:relative;display:flex;align-items:center;gap:12px;height:88px;padding:0 24px;border-radius:999px;border:1px solid var(--rule);background:oklch(0.985 0.012 92 / 0);white-space:nowrap}
+.tpick .dot{width:22px;height:22px;border-radius:50%}
+.tpick .nm{font-weight:600;font-size:27px;letter-spacing:.04em;color:var(--ink);white-space:nowrap}
+.tpick .hue{font-size:18px;letter-spacing:.06em;color:var(--ink-faint);margin-left:0;white-space:nowrap}
+.tpick .ring{position:absolute;inset:-9px;border-radius:999px;border:1px solid var(--thread);opacity:0}
+#w-cap{position:absolute;left:112px;right:112px;top:1470px;font-weight:400;font-size:32px;line-height:1.8;color:var(--ink-soft)}
+#w-next{position:absolute;left:112px;top:1640px}
+
+/* 第五幕 */
+#r-eyebrow{position:absolute;left:0;right:0;top:300px;text-align:center;z-index:3}
+#r-line{position:absolute;left:0;right:0;top:424px;text-align:center;font-weight:900;font-size:62px;letter-spacing:.03em;z-index:3}
+#r-thread{position:absolute;left:540px;top:180px;width:2px;height:540px;background:linear-gradient(180deg,color-mix(in oklab,var(--thread) 55%,transparent),color-mix(in oklab,var(--thread) 16%,transparent));transform-origin:50% 0}
+#r-bead{position:absolute;left:540px;top:720px;width:0;height:0;z-index:1}
+#r-ripple{position:absolute;left:540px;top:720px;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;border:1px solid var(--thread);z-index:0}
+#r-bead svg{position:absolute;left:-95px;top:-95px}
+#r-fly{position:absolute;left:70px;top:570px;z-index:4}
+#r-code{position:absolute;left:0;right:0;top:1150px;text-align:center}
+#r-code .lbl{font-family:var(--font-credit);font-size:21px;letter-spacing:.38em;color:var(--ink-faint)}
+#r-code .val{margin-top:16px;font-family:var(--font-ui);font-weight:500;font-size:66px;letter-spacing:.3em;text-indent:.3em;color:var(--ink)}
+#r-hint{position:absolute;left:170px;right:170px;top:1320px;text-align:center;font-weight:400;font-size:31px;line-height:1.8;color:var(--ink-soft)}
+#r-share{position:absolute;left:0;right:0;top:1430px;display:flex;justify-content:center;gap:18px}
+.chip{height:78px;padding:0 42px;border-radius:999px;border:1px solid var(--rule-strong);display:flex;align-items:center;font-family:var(--font-ui);font-size:24px;letter-spacing:.2em;color:var(--ink-soft);text-transform:uppercase}
+.chip.on{background:var(--thread);border-color:var(--thread);color:oklch(0.985 0.01 92)}
+#r-qrwrap{position:absolute;left:0;right:0;top:1505px;text-align:center}
+#r-qrhint{margin-top:28px;font-weight:400;font-size:29px;color:var(--ink-soft)}
+
+/* 第六幕 */
+#webwrap{position:absolute;left:0;right:0;top:360px;height:1240px;transform-origin:54% 46%}
+#web{position:absolute;inset:0;overflow:visible}
+#web .spoke{stroke:color-mix(in oklab,var(--water-line) 88%,transparent);stroke-width:1.3;fill:none}
+#web .ring{stroke:color-mix(in oklab,var(--water-line) 76%,transparent);stroke-width:1.2;fill:none}
+#w6-cap{position:absolute;left:112px;right:112px;top:1470px;font-weight:400;font-size:32px;line-height:1.8;color:var(--ink-soft)}
+#w6-zoom{position:absolute;left:130px;right:130px;top:700px;text-align:center}
+#w6-zoom .q{font-weight:900;font-size:74px;line-height:1.24;color:var(--ink);text-wrap:balance}
+#w6-zoom .by{margin-top:30px;font-family:var(--font-credit);font-size:22px;letter-spacing:.3em;color:var(--ink-faint);text-transform:uppercase;text-indent:.3em}
+
+/* 第七幕 */
+#z-lines{position:absolute;left:0;right:0;top:540px;text-align:center;font-weight:900;font-size:74px;line-height:1.42;letter-spacing:.03em}
+#z-net{position:absolute;left:0;right:0;top:900px;text-align:center}
+#z-url{font-family:var(--font-display);font-weight:600;font-size:84px;letter-spacing:.05em;color:var(--ink)}
+#z-sub{margin-top:22px;font-weight:400;font-size:30px;color:var(--ink-soft)}
+#z-qr{margin-top:56px}
+#z-qrh{margin-top:28px;font-weight:400;font-size:28px;color:var(--ink-soft)}
+#z-brand{position:absolute;left:0;right:0;top:900px;text-align:center;display:none}
+#z-brand .mk{font-weight:900;font-size:104px;letter-spacing:.12em;line-height:1.05;text-indent:.12em}
+#z-brand .en{margin-top:20px;font-family:var(--font-credit);font-size:22px;letter-spacing:.4em;color:var(--ink-faint);text-indent:.4em}
+#z-brand .find{margin-top:36px;font-weight:400;font-size:30px;color:var(--ink-soft)}
+
+/* 落版两版：官网版给网址和二维码；平台版只给名字（小红书这类平台不收外链、二维码） */
+html[data-ending="brand"] #z-net{display:none}
+html[data-ending="brand"] #z-brand{display:block}
+html[data-ending="brand"] #r-qrwrap{display:none}
+html[data-ending="brand"] #r-c1,html[data-ending="brand"] #r-c2{display:none}
+html[data-ending="brand"] #z-cta{top:1380px}
+html[data-ending="brand"] #z-mark{top:1650px}
+html[data-ending="brand"] #z-mark .mk,html[data-ending="brand"] #z-mark .en{display:none}
+#z-cta{position:absolute;left:0;right:0;top:1500px;text-align:center}
+#z-mark{position:absolute;left:0;right:0;top:1700px;text-align:center}
+#z-mark .mk{font-weight:900;font-size:46px;letter-spacing:.14em}
+#z-mark .en{margin-top:8px;font-family:var(--font-credit);font-size:20px;letter-spacing:.44em;color:var(--ink-faint);text-indent:.44em}
+#z-mark .st{margin-top:16px}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header id="mast">
+    <span class="mk">一线千愿<i>One Thread</i></span>
+    <nav><span>蛛网</span><span>回响</span><span>关于</span></nav>
+  </header>
+
+  <div class="field" id="field">
+    <div class="field__glow"></div>
+    <div class="field__band"></div>
+  </div>
+  <div id="z-web"></div>
+  <div class="thread" id="thread"></div>
+  <div class="vignette"></div>
+  <div class="grain" id="grain"></div>
+
+  <!-- 第一幕 -->
+  <section class="beat" id="b-title">
+    <p class="eyebrow" id="t-eyebrow">A Wish Cinema · 众人合著</p>
+    <div id="t-ghost"><span class="line"></span></div>
+    <div id="t-title"><span class="line" id="t-line"></span></div>
+    <div id="t-reflect"><span class="line">一线千愿</span></div>
+    <div class="rule-x" id="t-rule"></div>
+    <p id="t-lede">蛛丝很细，<br>却挂得住一千个愿望。</p>
+    <div id="t-credits">
+      <span class="credit">Now Showing</span>
+      <span class="stars">★★★★★</span>
+      <span class="zh">今夜，有人正在写下</span>
+    </div>
+  </section>
+
+  <!-- 第二幕 -->
+  <section class="beat" id="b-night">
+    <div id="n-stage"><div id="n-drip"></div><div id="n-bead"></div></div>
+    <div id="n-ripple"></div>
+    <div id="n-horizon"></div>
+    <div id="n-lines">
+      <p id="n-l1">凌晨两点，有一句话<br>卡在喉咙里。</p>
+      <p id="n-l2">不想发朋友圈，<br>不想被认识的人问起。</p>
+      <p id="n-l3">只想，<b>被看见一次</b>。</p>
+    </div>
+    <div id="n-foot"><span class="credit">To A Thread</span><span class="ui">写给一根丝</span></div>
+  </section>
+
+  <!-- 第三幕 -->
+  <section class="beat" id="b-cast">
+    <div class="acthead" id="c-head" style="top:280px">
+      <span class="no">Act I</span><h2 class="name">署名</h2><span class="bar" id="c-bar"></span><span class="en">Cast</span>
+    </div>
+    <p class="lede" id="c-lede" style="top:520px">在第一行，写下你的名字。<br>它会以 CAST 的身份，出现在你的海报上。</p>
+    <div id="c-field">
+      <div id="c-label">Cast · 你的署名</div>
+      <div id="c-input">
+        <div id="c-name"></div>
+        <div id="c-line"></div>
+      </div>
+    </div>
+    <div id="c-credit"><span class="credit">Cast</span><b id="c-cast">—</b></div>
+    <div id="c-next"><span class="pill" id="c-btn">下一步 · 许愿</span></div>
+  </section>
+
+  <!-- 第四幕 -->
+  <section class="beat" id="b-wish">
+    <div class="acthead" id="w-head" style="top:250px">
+      <span class="no">Act II</span><h2 class="name">许愿</h2><span class="bar" id="w-bar"></span><span class="en">The Wish</span>
+    </div>
+    <div id="w-ghost"><div class="poster__title" id="w-ghost-t"></div></div>
+    <div id="w-poster" class="poster">
+      <div class="poster__in">
+        <p class="poster__eyebrow">A Wish By <b id="w-name">佚名</b></p>
+        <blockquote class="poster__title" id="w-title"></blockquote>
+        <div class="poster__rule" id="w-rule"></div>
+        <p class="poster__sub" id="w-sub">"spoken at 02:14, 2026.09.11"</p>
+        <p class="poster__meta"><span>一线千愿</span><span class="stars">★★★★★</span><span id="w-thread">蜘蛛糸 · Spider Silk</span></p>
+      </div>
+    </div>
+    <div id="w-picker">
+      <div class="credit" style="font-size:21px">The Thread · 丝的颜色</div>
+      <div id="w-picks"></div>
+    </div>
+    <p id="w-cap">四条丝线，四种颜色。<br>选一条，整座许愿馆跟着它换色。</p>
+    <div id="w-next"><span class="pill" id="w-btn">牵起这条丝</span></div>
+  </section>
+
+  <!-- 第五幕 -->
+  <section class="beat" id="b-reveal">
+    <p class="eyebrow" id="r-eyebrow">The Reveal</p>
+    <div id="r-thread"></div>
+    <div id="r-ripple"></div>
+    <div id="r-bead"></div>
+    <p id="r-line">你的愿望，已经挂上蛛丝。</p>
+    <div id="r-fly"></div>
+    <div id="r-code">
+      <div class="lbl">编号</div>
+      <div class="val">9Q2MK4T</div>
+    </div>
+    <p id="r-hint">把这个编号留给想让他看见的人。<br>他在蛛网上输入它，就能翻到这一张海报。</p>
+    <div id="r-share">
+      <span class="chip" id="r-c1">链接</span><span class="chip" id="r-c2">二维码</span><span class="chip" id="r-c3">编号</span>
+    </div>
+    <div id="r-qrwrap"><canvas id="r-qr"></canvas><p id="r-qrhint">扫码，直接翻到这一张海报。</p></div>
+  </section>
+
+  <!-- 第六幕 -->
+  <section class="beat" id="b-web">
+    <div class="acthead" id="w6-head" style="top:250px">
+      <span class="no">Act III</span><h2 class="name">蛛网</h2><span class="bar" id="w6-bar"></span><span class="en">The Web</span>
+    </div>
+    <div id="webwrap"><svg id="web" viewBox="0 0 1080 1240" width="1080" height="1240"></svg></div>
+    <div id="w6-zoom"><p class="q" id="w6-q">愿所有认真写下的话都有人读到。</p><p class="by">A Wish By 被读到的人</p></div>
+    <p id="w6-cap">网上的每一个点，是一个陌生人写下的愿望。<br>没有点赞，没有评论，只有一个人读到了。</p>
+  </section>
+
+  <!-- 第七幕 -->
+  <section class="beat" id="b-cta">
+    <div id="z-lines">蛛丝很细，<br>却挂得住一千个愿望。</div>
+    <div id="z-net">
+      <div id="z-url">uncodeapps.icu</div>
+      <div id="z-sub">一线千愿 · 蛛丝许愿馆</div>
+      <div id="z-qr"><canvas id="z-qr-c"></canvas></div>
+      <div id="z-qrh">手机扫码，或直接输入上面的网址</div>
+    </div>
+    <div id="z-brand">
+      <div class="mk">一线千愿</div>
+      <div class="en">One Thread · 蛛丝许愿馆</div>
+      <div class="find">在搜索框里写下这四个字</div>
+    </div>
+    <div id="z-cta"><span class="pill" id="z-btn">现在，写下你的</span></div>
+    <div id="z-mark">
+      <div class="mk">一线千愿</div>
+      <div class="en">One Thread</div>
+      <div class="st"><span class="stars" style="font-size:24px">★★★★★</span></div>
+    </div>
+  </section>
+
+  <div id="curtain"></div>
+  <div id="bloom"></div>
+</div>
+
+<script type="module">
+import { drawQR } from '/assets/js/qr.js';
+
+const $ = (id) => document.getElementById(id);
+const cl01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+const pr = (t, a, b) => cl01((t - a) / (b - a));
+const eo4 = (x) => 1 - Math.pow(1 - x, 4);
+const eo5 = (x) => 1 - Math.pow(1 - x, 5);
+const eoe = (x) => x >= 1 ? 1 : 1 - Math.pow(2, -9 * x);
+const eio = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const seg = (t, a, d, f) => (f || eo4)(pr(t, a, a + d));
+const rh = (i) => { const x = Math.sin(i * 127.1 + 13.7) * 43758.5453; return x - Math.floor(x); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const NS = 'http://www.w3.org/2000/svg';
+
+function put(el, o, x, y, s, r) {
+  if (!el) return;
+  if (o <= 0.002) { el.style.opacity = '0'; el.style.visibility = 'hidden'; return; }
+  el.style.visibility = 'visible';
+  el.style.opacity = String(o);
+  el.style.transform = 'translate3d(' + (x || 0) + 'px,' + (y || 0) + 'px,0) scale(' + (s == null ? 1 : s) + ') rotate(' + (r || 0) + 'deg)';
+}
+
+/* ── 时间轴 ─────────────────────────────────────────── */
+const T_TITLE = 0, T_NIGHT = 4.2, T_CAST = 9.8, T_WISH = 15.6, T_REVEAL = 24.4, T_WEB = 32.2, T_CTA = 39.4, T_END = 45.6;
+const BEATS = [
+  ['b-title', T_TITLE, T_NIGHT], ['b-night', T_NIGHT, T_CAST], ['b-cast', T_CAST, T_WISH],
+  ['b-wish', T_WISH, T_REVEAL], ['b-reveal', T_REVEAL, T_WEB], ['b-web', T_WEB, T_CTA], ['b-cta', T_CTA, T_END]
+];
+const CUTS = [[T_NIGHT, .86, .30], [T_CAST, .84, .30], [T_WISH, .84, .30], [T_REVEAL, .97, .36], [T_WEB, .88, .30], [T_CTA, .88, .30]];
+
+const NAME = '林小满';
+const WISH = '愿妈妈今晚睡个好觉。';
+const WEBWISH = '愿所有认真写下的话都有人读到。';
+const SITE = 'https://uncodeapps.icu/';
+
+const TH = { silk: [0.6700, 0.1300, 32], abyss: [0.5600, 0.0850, 197], moon: [0.7450, 0.0900, 78], dusk: [0.5200, 0.1650, 26] };
+const THN = { silk: ['蜘蛛糸', 'Spider Silk', '珊瑚'], abyss: ['深海', 'Deep Water', '青'], moon: ['月白', 'Moon White', '淡金'], dusk: ['暮红', 'Dusk', '深绯'] };
+const ACCENT = [[0, 'silk'], [21.4, 'silk'], [22.6, 'abyss'], [23.8, 'moon'], [25.0, 'dusk'], [26.2, 'moon']];
+const PILLS = ['silk', 'abyss', 'moon', 'dusk'];
+
+const FADE = 0.30;   /* 换丝只在一瞬，中间还压一下彩度，免得路过一片脏绿 */
+function accentAt(t) {
+  let i = 0;
+  for (let k = 0; k < ACCENT.length; k++) if (ACCENT[k][0] <= t) i = k;
+  const to = TH[ACCENT[i][1]];
+  if (i === 0) return colAt(to, 1);
+  const from = TH[ACCENT[i - 1][1]];
+  const k = eo4(pr(t, ACCENT[i][0], ACCENT[i][0] + FADE));
+  return colAt([lerp(from[0], to[0], k), lerp(from[1], to[1], k), lerp(from[2], to[2], k)], 1 - 0.45 * Math.sin(Math.PI * k));
+}
+function colAt(c, mul) {
+  return 'oklch(' + c[0].toFixed(4) + ' ' + (c[1] * (mul == null ? 1 : mul)).toFixed(4) + ' ' + c[2].toFixed(2) + ')';
+}
+function threadIdAt(t) {
+  let i = 0;
+  for (let k = 0; k < ACCENT.length; k++) if (ACCENT[k][0] <= t) i = k;
+  return ACCENT[i][1];
+}
+
+/* 落版只有两版：url = 官网 / B站 / 知乎用，brand = 小红书这类不收外链的平台用 */
+const ENDING = (new URLSearchParams(location.search).get('ending') === 'brand') ? 'brand' : 'url';
+document.documentElement.dataset.ending = ENDING;
+
+/* ── 颗粒 ───────────────────────────────────────────── */
+(function grain() {
+  const c = document.createElement('canvas'); c.width = 160; c.height = 160;
+  const g = c.getContext('2d');
+  const im = g.createImageData(160, 160);
+  for (let i = 0; i < 160 * 160; i++) {
+    const v = rh(i), w = rh(i + 7919);
+    im.data[i * 4] = v < .5 ? 22 : 250;
+    im.data[i * 4 + 1] = v < .5 ? 30 : 248;
+    im.data[i * 4 + 2] = v < .5 ? 34 : 240;
+    im.data[i * 4 + 3] = Math.round(w * 40);
+  }
+  g.putImageData(im, 0, 0);
+  $('grain').style.backgroundImage = 'url(' + c.toDataURL('image/png') + ')';
+})();
+
+/* ── 标题逐字 ───────────────────────────────────────── */
+(function buildTitle() {
+  const chars = '一线千愿';
+  const mk = (parent) => {
+    for (let i = 0; i < chars.length; i++) {
+      const s = document.createElement('span');
+      const it = document.createElement('i');
+      it.textContent = chars[i];
+      s.appendChild(it);
+      parent.appendChild(s);
+    }
+  };
+  mk($('t-line'));
+  mk($('t-ghost').firstElementChild);
+})();
+
+/* ── 挑丝 ───────────────────────────────────────────── */
+(function buildPicks() {
+  const row = $('w-picks');
+  for (let i = 0; i < PILLS.length; i++) {
+    const id = PILLS[i], c = TH[id];
+    const el = document.createElement('div');
+    el.className = 'tpick'; el.id = 'pick-' + id;
+    el.innerHTML = '<span class="dot" style="background:oklch(' + c[0] + ' ' + c[1] + ' ' + c[2] + ')"></span>' +
+      '<span class="nm">' + THN[id][0] + '</span><span class="hue">' + THN[id][2] + '</span>' +
+      '<span class="ring"></span>';
+    row.appendChild(el);
+  }
+})();
+
+/* ── 露珠 ───────────────────────────────────────────── */
+function beadSVG(size, core, k) {
+  return '<svg viewBox="0 0 400 400" width="' + size + '" height="' + size + '">' +
+    '<defs><radialGradient id="bg' + k + '" cx="34%" cy="28%" r="78%">' +
+    '<stop offset="0%" stop-color="oklch(0.995 0.012 95)" stop-opacity="0.98"/>' +
+    '<stop offset="46%" stop-color="oklch(0.955 0.032 190)" stop-opacity="0.72"/>' +
+    '<stop offset="100%" stop-color="oklch(0.870 0.060 197)" stop-opacity="0.42"/></radialGradient>' +
+    '<radialGradient id="cg' + k + '" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="' + core + '" stop-opacity="0.8"/>' +
+    '<stop offset="58%" stop-color="' + core + '" stop-opacity="0.2"/>' +
+    '<stop offset="100%" stop-color="' + core + '" stop-opacity="0"/></radialGradient></defs>' +
+    '<circle cx="200" cy="200" r="200" fill="url(#cg' + k + ')"/>' +
+    '<circle cx="200" cy="206" r="126" fill="url(#bg' + k + ')"/>' +
+    '<ellipse cx="200" cy="196" rx="127" ry="122" fill="none" stroke="oklch(0.93 0.035 195)" stroke-opacity="0.5" stroke-width="1.4"/>' +
+    '<ellipse cx="163" cy="150" rx="30" ry="21" fill="oklch(1 0 0 / 0.86)" transform="rotate(-28 163 150)"/>' +
+    '<ellipse cx="246" cy="256" rx="19" ry="12" fill="oklch(1 0 0 / 0.32)" transform="rotate(-24 246 256)"/></svg>';
+}
+
+/* ── 蛛网 ───────────────────────────────────────────── */
+const WEB = { cx: 520, cy: 560, spokes: 8, rings: 6, R: 462, rot: -Math.PI / 2 + Math.PI / 8 };
+(function buildWeb() {
+  const svg = $('web');
+  const g = document.createElementNS(NS, 'g');
+  svg.appendChild(g);
+  const pt = (r, a) => [WEB.cx + Math.cos(a) * r, WEB.cy + Math.sin(a) * r];
+  const step = 2 * Math.PI / WEB.spokes;
+  const Rof = (i, j) => WEB.R * Math.pow(i / WEB.rings, 0.92) * (1 + (rh(i * 7.13 + j * 3.7) - .5) * 0.05);
+  for (let j = 0; j < WEB.spokes; j++) {
+    const a = WEB.rot + j * step;
+    const p = pt(WEB.R * 1.01, a), q = pt(WEB.R * 0.14, a);
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', q[0].toFixed(1)); ln.setAttribute('y1', q[1].toFixed(1));
+    ln.setAttribute('x2', p[0].toFixed(1)); ln.setAttribute('y2', p[1].toFixed(1));
+    ln.setAttribute('class', 'spoke');
+    ln.dataset.len = (WEB.R * 0.87).toFixed(1);
+    g.appendChild(ln);
+  }
+  for (let i = 1; i <= WEB.rings; i++) {
+    let d = '';
+    for (let j = 0; j <= WEB.spokes; j++) {
+      const jj = j % WEB.spokes;
+      const a0 = WEB.rot + jj * step;
+      const p0 = pt(Rof(i, jj), a0);
+      if (j === 0) { d += 'M' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1); continue; }
+      const am = a0 - step / 2;
+      const pm = pt(Rof(i, jj) * 0.965, am);
+      d += ' Q' + pm[0].toFixed(1) + ' ' + pm[1].toFixed(1) + ' ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1);
+    }
+    const pth = document.createElementNS(NS, 'path');
+    pth.setAttribute('d', d); pth.setAttribute('class', 'ring');
+    g.appendChild(pth);
+    pth.dataset.len = Math.ceil(pth.getTotalLength()) + '';
+  }
+  const beads = document.createElementNS(NS, 'g');
+  beads.setAttribute('id', 'beads');
+  g.appendChild(beads);
+  const ids = ['silk', 'abyss', 'moon', 'dusk'];
+  let n = 0;
+  for (let i = 1; i <= WEB.rings && n < 36; i++) {
+    for (let j = 0; j < WEB.spokes; j++) {
+      if (rh(i * 53.7 + j * 17.3) < 0.3) continue;
+      if (n >= 36) break;
+      const a0 = WEB.rot + j * step;
+      const p = pt(Rof(i, j), a0);
+      const c = TH[ids[Math.floor(rh(i * 91.3 + j * 13.7) * 4) % 4]];
+      const col = 'oklch(' + c[0] + ' ' + c[1] + ' ' + c[2] + ')';
+      const rr = 7 + rh(i * 11.9 + j * 29.1) * 9;
+      const grp = document.createElementNS(NS, 'g');
+      grp.setAttribute('class', 'bead');
+      const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+      grp.appendChild(mk('circle', { cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: (rr * 3.6).toFixed(1), fill: col, opacity: '0.15' }));
+      grp.appendChild(mk('circle', { cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: rr.toFixed(1), fill: col, opacity: '0.92' }));
+      grp.appendChild(mk('circle', { cx: (p[0] - rr * .32).toFixed(1), cy: (p[1] - rr * .36).toFixed(1), r: (rr * .3).toFixed(1), fill: 'oklch(1 0 0 / 0.85)' }));
+      grp.style.transformBox = 'fill-box';
+      grp.style.transformOrigin = 'center';
+      grp.style.opacity = '0';
+      beads.appendChild(grp);
+      n++;
+    }
+  }
+  $('z-web').appendChild(g.cloneNode(true)).setAttribute('opacity', '1');
+})();
+
+/* ── 字号自适应 ─────────────────────────────────────── */
+function fit(el, maxPx, minPx, maxLines) {
+  let lo = minPx, hi = maxPx, best = minPx;
+  for (let i = 0; i < 15; i++) {
+    const mid = (lo + hi) / 2;
+    el.style.fontSize = mid + 'px';
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || mid * 1.1;
+    const lines = Math.round(el.getBoundingClientRect().height / lh);
+    if (lines <= maxLines) { best = mid; lo = mid; } else { hi = mid; }
+  }
+  el.style.fontSize = best.toFixed(1) + 'px';
+  return best;
+}
+
+/* ── 准备 ───────────────────────────────────────────── */
+function init() {
+  $('n-bead').innerHTML = beadSVG(560, 'oklch(0.6700 0.1300 32)', 'N');
+  $('r-bead').innerHTML = beadSVG(190, 'oklch(0.6700 0.1300 32)', 'R');
+  $('r-fly').innerHTML = '<div class="poster"><div class="poster__in">' +
+    '<p class="poster__eyebrow">A Wish By <b>' + NAME + '</b></p>' +
+    '<blockquote class="poster__title" id="r-fly-t">' + WISH + '</blockquote>' +
+    '<div class="poster__rule" style="transform:scaleX(1)"></div>' +
+    '<p class="poster__sub">"spoken at 02:14, 2026.09.11"</p>' +
+    '<p class="poster__meta"><span>一线千愿</span><span class="stars">★★★★★</span><span>月白 · Moon White</span></p>' +
+    '</div></div>';
+  const beats = document.querySelectorAll('.beat');
+  for (const b of beats) { b.style.display = 'block'; b.style.visibility = 'hidden'; }
+  $('w-title').textContent = WISH;
+  $('w-name').textContent = NAME;
+  const fs = fitPoster();
+  $('w-ghost-t').style.fontSize = fs.toFixed(1) + 'px';
+  $('w-ghost-t').textContent = WISH;
+  $('r-fly-t').style.fontSize = fs.toFixed(1) + 'px';
+  fit($('w6-q'), 96, 44, 2);
+  for (const b of beats) { b.style.visibility = ''; b.style.display = ''; }
+  $('w-title').textContent = '';
+}
+
+/* 海报自适应：标题要大到撑满，又不能压到底部的星标 */
+function fitPoster() {
+  const el = $('w-title');
+  const limit = $('w-poster').getBoundingClientRect().bottom - 74;
+  let best = 58;
+  for (let f = 130; f >= 58; f -= 2) {
+    el.style.fontSize = f + 'px';
+    if ($('w-sub').getBoundingClientRect().bottom <= limit) { best = f; break; }
+  }
+  el.style.fontSize = best.toFixed(1) + 'px';
+  return best;
+}
+
+/* ── 逐帧 ───────────────────────────────────────────── */
+let QR1 = false, QR2 = false;
+function frame(t) {
+  const acc = accentAt(t);
+  document.documentElement.style.setProperty('--thread', acc);
+
+  const drift = t * 1.15 + Math.sin(t * 0.13) * 14;
+  $('field').style.transform = 'translate3d(0,' + (-drift).toFixed(1) + 'px,0) scale(' + (1.05 + 0.012 * Math.sin(t * 0.19)).toFixed(4) + ')';
+  $('grain').style.backgroundPosition = Math.round(rh(Math.floor(t * 30) * 3.1) * 160) + 'px ' + Math.round(rh(Math.floor(t * 30) * 7.7) * 160) + 'px';
+  $('grain').style.opacity = String(0.4 + 0.1 * Math.sin(t * 1.7));
+  const thDraw = seg(t, 0.2, 2.2, eoe);
+  $('thread').style.transform = 'scaleY(' + thDraw.toFixed(4) + ')';
+  $('thread').style.opacity = String(0.12 + 0.42 * thDraw);
+
+  let cur = 0;
+  for (const c of CUTS) {
+    const d = Math.abs(t - c[0]);
+    if (d < c[2] / 2) cur = Math.max(cur, c[1] * (1 - Math.pow(d / (c[2] / 2), 2)));
+  }
+  $('curtain').style.opacity = String(cur);
+  const inB = 1 - seg(t, 0, 1.5, eoe);
+  const outB = seg(t, T_END - 0.95, 0.95, eio);
+  $('bloom').style.opacity = String(Math.max(inB, outB));
+  $('mast').style.opacity = String(1 - seg(t, T_CTA + 0.4, 1.3, eio));
+
+  let active = null;
+  for (const bt of BEATS) if (t >= bt[1] && t < bt[2]) active = bt[0];
+  for (const bt of BEATS) $(bt[0]).style.display = bt[0] === active ? 'block' : 'none';
+  $('z-web').style.opacity = active === 'b-cta' ? String(0.075 * (1 - outB)) : '0';
+  if (active !== 'b-title') { $('t-title').style.visibility = 'hidden'; }
+
+  /* ── 一 · 标题 ── */
+  if (active === 'b-title') {
+    const e1 = seg(t, 0.35, 0.85);
+    put($('t-eyebrow'), e1, 0, (1 - e1) * 20, 1);
+    const ch = $('t-line').children, gh = $('t-ghost').firstElementChild.children;
+    for (let i = 0; i < ch.length; i++) {
+      const k = seg(t, 0.72 + i * 0.11, 1.05, eoe);
+      const k2 = seg(t, 1.16 + i * 0.11, 1.05, eoe);
+      ch[i].firstElementChild.style.transform = 'translate3d(0,' + ((1 - k) * 200).toFixed(1) + 'px,0)';
+      ch[i].firstElementChild.style.opacity = String(k);
+      gh[i].firstElementChild.style.transform = 'translate3d(0,' + ((1 - k2) * 200).toFixed(1) + 'px,0)';
+      gh[i].firstElementChild.style.opacity = String(k2);
+    }
+    const gs = seg(t, 1.16, 1.3, eoe);
+    $('t-ghost').style.transform = 'translate3d(' + (-13 * gs).toFixed(1) + 'px,' + (-15 * gs).toFixed(1) + 'px,0)';
+    $('t-ghost').style.opacity = String(0.5 * gs);
+    const rf = seg(t, 1.6, 1.2, eoe);
+    $('t-reflect').style.opacity = String(rf);
+    $('t-reflect').style.transform = 'translate3d(0,' + ((1 - rf) * -22).toFixed(1) + 'px,0)';
+    const ru = seg(t, 2.2, 0.9, eoe);
+    $('t-rule').style.transform = 'scaleX(' + ru.toFixed(4) + ')';
+    $('t-rule').style.opacity = String(0.9 * ru);
+    const ld = seg(t, 2.5, 0.95);
+    put($('t-lede'), ld, 0, (1 - ld) * 26, 1);
+    const cr = seg(t, 3.1, 0.8);
+    put($('t-credits'), cr, 0, (1 - cr) * 18, 1);
+  }
+
+  /* ── 二 · 夜 ── */
+  if (active === 'b-night') {
+    const drop = seg(t, T_NIGHT + 0.15, 1.35, eoe);
+    const wob = Math.sin(Math.min(1, pr(t, T_NIGHT + 1.5, T_NIGHT + 2.8)) * Math.PI * 3) * Math.exp(-Math.max(0, t - T_NIGHT - 1.5) * 3.2) * 13;
+    put($('n-bead'), drop, 0, (1 - drop) * -150 + wob, 0.88 + 0.12 * drop, 0);
+    $('n-bead').style.filter = 'blur(' + ((1 - drop) * 7).toFixed(2) + 'px)';
+    $('n-drip').style.transform = 'scaleY(' + drop.toFixed(4) + ')';
+    $('n-drip').style.opacity = String(0.85 * drop);
+    const l1 = seg(t, T_NIGHT + 0.75, 0.9);
+    const l2 = seg(t, T_NIGHT + 2.4, 0.9);
+    const l3 = seg(t, T_NIGHT + 4.0, 0.95);
+    put($('n-l1'), l1 * (1 - 0.62 * seg(t, T_NIGHT + 2.4, 0.7)), 0, (1 - l1) * 30, 1);
+    put($('n-l2'), l2 * (1 - 0.55 * seg(t, T_NIGHT + 4.0, 0.7)), 0, (1 - l2) * 30, 1);
+    put($('n-l3'), l3, 0, (1 - l3) * 30, 0.98 + 0.02 * l3);
+    put($('n-foot'), seg(t, T_NIGHT + 4.6, 0.9) * 0.9, 0, 0, 1);
+    $('n-horizon').style.transform = 'scaleX(' + seg(t, T_NIGHT + 1.4, 1.4, eoe).toFixed(4) + ')';
+    const nrp = pr(t, T_NIGHT + 1.42, T_NIGHT + 2.4);
+    put($('n-ripple'), t > T_NIGHT + 1.38 ? (1 - nrp) * 0.5 : 0, 0, 0, 0.25 + nrp * 1.9, 0);
+  }
+
+  /* ── 三 · 署名 ── */
+  if (active === 'b-cast') {
+    const h = seg(t, T_CAST + 0.12, 0.85);
+    $('c-head').style.opacity = String(h);
+    $('c-head').style.transform = 'translate3d(0,' + ((1 - h) * 24).toFixed(1) + 'px,0)';
+    $('c-bar').style.transform = 'scaleX(' + seg(t, T_CAST + 0.35, 1.0, eoe).toFixed(4) + ')';
+    const ld = seg(t, T_CAST + 0.8, 0.9);
+    put($('c-lede'), ld, 0, (1 - ld) * 22, 1);
+    $('c-label').style.opacity = String(seg(t, T_CAST + 1.3, 0.6));
+    $('c-line').style.transform = 'scaleX(' + seg(t, T_CAST + 1.4, 0.9, eoe).toFixed(4) + ')';
+    $('c-line').style.opacity = String(0.8 * seg(t, T_CAST + 1.4, 0.6));
+    const n = Math.floor(pr(t, T_CAST + 2.0, T_CAST + 2.85) * NAME.length);
+    $('c-name').textContent = NAME.slice(0, n);
+    if (!$('c-caret')) { const c = document.createElement('span'); c.className = 'caret'; c.id = 'c-caret'; $('c-name').appendChild(c); }
+    $('c-caret').style.opacity = String(t > T_CAST + 2.0 && t < T_CAST + 3.35 ? (Math.floor(t * 2.6) % 2 === 0 ? 1 : 0.06) : 0);
+    const cr = seg(t, T_CAST + 3.4, 0.8);
+    put($('c-credit'), cr, -(1 - cr) * 20, 0, 1);
+    $('c-cast').textContent = NAME;
+    const bt = seg(t, T_CAST + 4.6, 0.5);
+    put($('c-next'), bt, 0, (1 - bt) * 16, 1);
+    const press = t > T_CAST + 5.35 ? 1 : 0;
+    $('c-btn').style.transform = 'scale(' + (press ? 0.965 : 1) + ')';
+    $('c-btn').style.filter = press ? 'brightness(0.97)' : 'none';
+  }
+
+  /* ── 四 · 许愿 ── */
+  if (active === 'b-wish') {
+    const h = seg(t, T_WISH + 0.12, 0.85);
+    $('w-head').style.opacity = String(h);
+    $('w-head').style.transform = 'translate3d(0,' + ((1 - h) * 24).toFixed(1) + 'px,0)';
+    $('w-bar').style.transform = 'scaleX(' + seg(t, T_WISH + 0.35, 1.0, eoe).toFixed(4) + ')';
+    const ps = seg(t, T_WISH + 0.7, 1.0, eoe);
+    $('w-poster').style.opacity = String(ps);
+    $('w-poster').style.transform = 'translate3d(0,' + ((1 - ps) * 46).toFixed(1) + 'px,0) scale(' + (0.94 + 0.06 * ps).toFixed(4) + ')';
+    $('w-ghost').style.opacity = String(0.14 * seg(t, T_WISH + 1.5, 1.0));
+    const n = Math.floor(pr(t, T_WISH + 1.4, T_WISH + 3.2) * WISH.length);
+    $('w-title').textContent = WISH.slice(0, n);
+    if (!$('w-caret')) { const c = document.createElement('span'); c.className = 'caret'; c.id = 'w-caret'; $('w-title').appendChild(c); }
+    const typing = t > T_WISH + 1.3 && t < T_WISH + 3.45;
+    $('w-caret').style.opacity = String(typing ? (Math.floor(t * 2.6) % 2 === 0 ? 1 : 0.06) : Math.max(0, 1 - pr(t, T_WISH + 3.45, T_WISH + 4.0)));
+    $('w-ghost-t').textContent = WISH.slice(0, n);
+    $('w-rule').style.transform = 'scaleX(' + seg(t, T_WISH + 3.5, 0.8, eoe).toFixed(4) + ')';
+    $('w-sub').style.opacity = String(seg(t, T_WISH + 3.8, 0.7));
+    const pick = seg(t, T_WISH + 4.6, 0.8);
+    put($('w-picker'), pick, 0, (1 - pick) * 20, 1);
+    const cap = seg(t, T_WISH + 5.0, 0.8);
+    put($('w-cap'), cap * 0.95, 0, (1 - cap) * 18, 1);
+    const curId = threadIdAt(t);
+    for (const pid of PILLS) {
+      const on = pid === curId && t >= 21.4;
+      $('pick-' + pid).querySelector('.ring').style.opacity = on ? '1' : '0';
+      $('pick-' + pid).style.borderColor = on ? acc : '';
+      $('pick-' + pid).style.background = on ? 'oklch(0.986 0.012 92 / 0.6)' : '';
+    }
+    const nm = THN[curId];
+    $('w-thread').textContent = nm[0] + ' · ' + nm[1];
+    $('w-thread').style.color = t >= 21.0 ? acc : '';
+    const bw = seg(t, T_WISH + 8.0, 0.5);
+    put($('w-next'), bw * (1 - 0.5 * seg(t, T_WISH + 8.5, 0.4)), 0, (1 - bw) * 16, 1);
+    $('w-btn').style.transform = 'scale(' + (t > T_WISH + 8.6 ? 0.965 : 1) + ')';
+  }
+
+  /* ── 五 · 揭幕 ── */
+  if (active === 'b-reveal') {
+    const ey = seg(t, T_REVEAL + 0.5, 0.8);
+    put($('r-eyebrow'), ey, 0, (1 - ey) * 18, 1);
+    const ln = seg(t, T_REVEAL + 0.72, 0.95);
+    put($('r-line'), ln, 0, (1 - ln) * 26, 1);
+    const td = seg(t, T_REVEAL + 0.9, 1.2, eoe);
+    $('r-thread').style.transform = 'scaleY(' + td.toFixed(4) + ')';
+    $('r-thread').style.opacity = String(0.9 * td);
+    /* 海报收成一颗露珠 */
+    const f0 = T_REVEAL + 1.8, f1 = T_REVEAL + 2.8;
+    const fp = pr(t, f0, f1);
+    const pop = eo5(pr(t, T_REVEAL + 3.0, T_REVEAL + 3.5));
+    const bd = seg(t, T_REVEAL + 2.0, 1.0, eoe);
+    const sc = (0.45 + 0.55 * bd) * (1 + 0.6 * (1 - pop));
+    put($('r-bead'), bd * (1 - 0.2 * (1 - pop)), 0, (1 - bd) * -120, sc, 0);
+    $('r-bead').style.filter = 'drop-shadow(0 0 ' + (30 * bd).toFixed(0) + 'px color-mix(in oklab,var(--thread) 55%,transparent))';
+    if (t < f1) {
+      const e = eio(fp);
+      put($('r-fly'), 1, 0, lerp(0, -94.5, e), lerp(1, 0.05, e), lerp(0, -6, e));
+      $('r-fly').style.filter = 'blur(' + (e * 2.4).toFixed(2) + 'px)';
+    } else { put($('r-fly'), 0, 0, 0, 1); }
+    const rp = pr(t, T_REVEAL + 3.05, T_REVEAL + 3.95);
+    put($('r-ripple'), t > T_REVEAL + 3.0 ? (1 - rp) * 0.55 : 0, 0, 0, 0.25 + rp * 2.1, 0);
+    const cd = seg(t, T_REVEAL + 3.5, 0.8);
+    put($('r-code'), cd, 0, (1 - cd) * 22, 1);
+    const hi = seg(t, T_REVEAL + 4.2, 0.85);
+    put($('r-hint'), hi, 0, (1 - hi) * 20, 1);
+    for (let i = 1; i <= 3; i++) {
+      const c = seg(t, T_REVEAL + 4.9 + (i - 1) * 0.16, 0.6);
+      const el = $('r-c' + i);
+      el.style.opacity = String(c);
+      el.style.transform = 'translate3d(0,' + ((1 - c) * 14).toFixed(1) + 'px,0)';
+    }
+    if (ENDING !== 'brand') {
+      const onQr = t > T_REVEAL + 5.7;
+      $('r-c1').className = 'chip' + (onQr ? '' : ' on');
+      $('r-c2').className = 'chip' + (onQr ? ' on' : '');
+      const qs = seg(t, T_REVEAL + 5.7, 0.9);
+      put($('r-qrwrap'), qs, 0, (1 - qs) * 26, 1);
+      if (!QR1 && t > T_REVEAL + 5.3) { drawQR($('r-qr'), SITE, { size: 280, dark: '#20313a', light: '#ffffff', quiet: 3 }); QR1 = true; }
+    } else {
+      $('r-c3').className = 'chip on';
+    }
+  }
+
+  /* ── 六 · 蛛网 ── */
+  if (active === 'b-web') {
+    const h = seg(t, T_WEB + 0.1, 0.85);
+    $('w6-head').style.opacity = String(h);
+    $('w6-head').style.transform = 'translate3d(0,' + ((1 - h) * 22).toFixed(1) + 'px,0)';
+    $('w6-bar').style.transform = 'scaleX(' + seg(t, T_WEB + 0.3, 1.0, eoe).toFixed(4) + ')';
+    const svg = $('web');
+    const spokes = svg.querySelectorAll('.spoke');
+    const rings = svg.querySelectorAll('.ring');
+    const beads = svg.querySelectorAll('#beads .bead');
+    for (let i = 0; i < spokes.length; i++) {
+      const sp = eo4(pr(t, T_WEB + 0.35 + i * 0.055, T_WEB + 1.55 + i * 0.055));
+      spokes[i].style.strokeDasharray = spokes[i].dataset.len + ' ' + spokes[i].dataset.len;
+      spokes[i].style.strokeDashoffset = String((1 - sp) * spokes[i].dataset.len);
+    }
+    for (let i = 0; i < rings.length; i++) {
+      const rp = eo4(pr(t, T_WEB + 1.05 + i * 0.12, T_WEB + 2.0 + i * 0.12));
+      rings[i].style.strokeDasharray = rings[i].dataset.len + ' ' + rings[i].dataset.len;
+      rings[i].style.strokeDashoffset = String((1 - rp) * rings[i].dataset.len);
+    }
+    const zp = eoe(pr(t, T_WEB + 5.2, T_WEB + 6.5));
+    const bn = beads.length;
+    for (let i = 0; i < bn; i++) {
+      const at = T_WEB + 1.9 + (i / bn) * 2.9;
+      const k = seg(t, at, 0.55, eo5);
+      const pl = 1 + 0.22 * Math.sin(Math.max(0, t - at) * 4.4) * Math.exp(-Math.max(0, t - at) * 2.2);
+      beads[i].style.opacity = String(k * (1 - zp));
+      beads[i].style.transform = 'scale(' + Math.max(0.001, k * pl).toFixed(3) + ')';
+    }
+    $('webwrap').style.transform = 'scale(' + (1 + zp * 1.35).toFixed(4) + ')';
+    $('webwrap').style.opacity = String(1 - 0.88 * zp);
+    const cap = seg(t, T_WEB + 3.2, 0.9);
+    const qs = seg(t, T_WEB + 6.0, 0.95);
+    put($('w6-cap'), cap * 0.96 * (1 - qs), 0, (1 - cap) * 18, 1);
+    put($('w6-zoom'), qs, 0, (1 - qs) * 24, 0.98 + 0.02 * qs);
+  }
+
+  /* ── 七 · 落版 ── */
+  if (active === 'b-cta') {
+    const l1 = seg(t, T_CTA + 0.45, 1.05);
+    put($('z-lines'), l1 * (1 - 0.5 * seg(t, T_CTA + 3.4, 1.2)), 0, (1 - l1) * 30, 0.985 + 0.015 * l1);
+    if (ENDING === 'brand') {
+      const bd = seg(t, T_CTA + 1.5, 1.0, eoe);
+      put($('z-brand'), bd, 0, (1 - bd) * 26, 0.99 + 0.01 * bd);
+    } else {
+      const u = seg(t, T_CTA + 1.7, 0.9, eoe);
+      put($('z-url'), u, 0, (1 - u) * 22, 1);
+      const sb = seg(t, T_CTA + 2.0, 0.8);
+      put($('z-sub'), sb * 0.95, 0, (1 - sb) * 16, 1);
+      const q = seg(t, T_CTA + 2.5, 0.9);
+      put($('z-qr'), q, 0, (1 - q) * 22, 1);
+      if (!QR2 && t > T_CTA + 2.1) { drawQR($('z-qr-c'), SITE, { size: 320, dark: '#20313a', light: '#ffffff', quiet: 3 }); QR2 = true; }
+      put($('z-qrh'), seg(t, T_CTA + 2.8, 0.8) * 0.9, 0, 0, 1);
+    }
+    const cb = seg(t, T_CTA + 3.4, 0.7);
+    put($('z-cta'), cb, 0, (1 - cb) * 16, 1);
+    const mk = seg(t, T_CTA + 4.2, 0.9);
+    put($('z-mark'), mk, 0, (1 - mk) * 18, 1);
+  }
+
+  window.__t = t;
+}
+
+window.__seek = function (ms) { frame(ms / 1000); return true; };
+window.__duration = T_END * 1000;
+
+(async function boot() {
+  $('w-title').textContent = WISH;
+  $('w-name').textContent = NAME;
+  $('w6-q').textContent = WEBWISH;
+  const CJK = document.body.textContent + WISH + WEBWISH + NAME;
+  const fam = 'Noto Serif SC';
+  await document.fonts.ready;
+  try {
+    await Promise.all([
+      document.fonts.load('900 100px "' + fam + '"', CJK),
+      document.fonts.load('400 100px "' + fam + '"', CJK),
+      document.fonts.load('600 100px "' + fam + '"', CJK),
+      document.fonts.load('400 100px "Cinzel"', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+      document.fonts.load('600 100px "Cinzel"', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+      document.fonts.load('600 100px "Bodoni Moda"', 'uncodeappsicu'),
+      document.fonts.load('400 100px "Jost"', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+      document.fonts.load('500 100px "Jost"', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+    ]);
+  } catch (e) { }
+  await document.fonts.ready;
+  init();
+  frame(0);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "yixian-trailer",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "一线千愿宣传片渲染管线：Chromium 逐帧截图 + Node 合声 + ffmpeg 编码",
+  "scripts": {
+    "audio": "node audio.mjs",
+    "video": "node render.mjs",
+    "video:brand": "node render.mjs brand",
+    "stills": "node render.mjs stills 3 13.8 21.9 27.6 30.6 35.4 45",
+    "stills:brand": "node render.mjs stills brand 3 13.8 21.9 27.6 30.6 35.4 45",
+    "covers": "node cover.mjs",
+    "og": "node render.mjs og",
+    "serve": "node serve.mjs",
+    "all": "node audio.mjs && node render.mjs && node render.mjs brand && npm run stills && npm run stills:brand && node cover.mjs && node render.mjs og"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@fontsource/noto-serif-sc": "^5.3.0",
+    "puppeteer-core": "^25.11.0"
+  }
+}
