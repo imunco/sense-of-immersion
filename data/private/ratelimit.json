@@ -1,14 +1,6 @@
 {
-  "devices": {
-    "7085fbc11a121b1838cb03ca": [
-      1790124752754
-    ]
-  },
-  "content": {
-    "a8f2c9aa05c2a2c9d9747e025d681d276ef4cfda79ec35619c58455698f3ba2d": [
-      1790124752754
-    ]
-  },
+  "devices": {},
+  "content": {},
   "global": [],
   "total": 2,
   "wrote": {
@@ -43,8 +35,6 @@
   "readGlobal": [
     1790126476363
   ],
-  "wishReads": {
-    "w_mude1n3k_2ydckk": 1790126476363
-  },
+  "wishReads": {},
   "delNonces": []
 }
